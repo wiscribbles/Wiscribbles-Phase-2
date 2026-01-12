@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+}
+
+/* PDF Viewer Custom Styles */
+.pdf-viewer {
+  background: #f8f9fa;
+}
+
+.pdf-content {
+  background: #e9ecef;
+  min-height: 400px;
+}
+
+.pdf-page {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  background: white;
+  margin: 10px;
+}
+
+.pdf-controls .btn-group .btn {
+  border-radius: 0;
+}
+
+.pdf-controls .btn-group .btn:first-child {
+  border-radius: 0.375rem 0 0 0.375rem;
+}
+
+.pdf-controls .btn-group .btn:last-child {
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+/* Smooth transitions for PDF interactions */
+.pdf-page {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Loading states */
+.pdf-viewer .spinner-border {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Document version toggle animations */
+.badge {
+  transition: all 0.3s ease;
+}
+
+/* Success state animations */
+.alert-success {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Button hover effects */
+.btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Signature panel styling */
+.signature-preview {
+  transition: all 0.3s ease;
+}
+
+.signature-preview:hover {
+  background-color: #e9ecef !important;
+}
+
+/* PDF document positioning */
+.react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.react-pdf__Page {
+  margin-bottom: 1rem;
+}
+
+.react-pdf__Page__canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Responsive PDF viewer */
+@media (max-width: 768px) {
+  .pdf-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .pdf-controls .btn-group {
+    width: 100%;
+  }
+  
+  .pdf-page {
+    margin: 5px;
+  }
+}
+
+/* Error states */
+.pdf-viewer .text-danger {
+  color: #dc3545 !important;
+}
+
+/* Success badge positioning */
+.position-absolute.top-0.end-0 {
+  z-index: 10;
+}
+
+/* Logo and Image Quality Optimization */
+.logo-image,
+img[alt*="Logo"],
+img[alt*="logo"] {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .logo-image,
+  img[alt*="Logo"],
+  img[alt*="logo"] {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: auto;
+  }
+}
+
+/* Mobile logo responsive styling */
+@media (max-width: 768px) {
+  .logo-image,
+  img[alt*="Logo"],
+  img[alt*="logo"] {
+    max-width: 100%;
+    height: auto !important;
+    min-height: 40px;
+  }
+  
+  /* Ensure logos don't get too small on very small screens */
+  @media (max-width: 480px) {
+    .logo-image,
+    img[alt*="Logo"],
+    img[alt*="logo"] {
+      min-height: 35px;
+    }
+  }
+}
+
+/* Logo container improvements */
+.logo-link {
+  display: inline-block;
+  line-height: 0;
+}
+
+/* General image quality improvements */
+img {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

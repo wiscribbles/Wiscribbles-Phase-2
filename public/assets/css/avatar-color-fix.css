@@ -1,0 +1,99 @@
+/* Avatar Color Preservation CSS */
+/* This CSS ensures avatar colors are preserved during color switching */
+
+/* High priority styles for avatars */
+.avatar,
+[class*="avatar"],
+.profile-avatar,
+.user-avatar,
+div[style*="backgroundColor"],
+div[style*="background-color"] {
+  /* Preserve existing background colors with !important */
+  background-color: var(--avatar-bg-color) !important;
+  color: var(--avatar-text-color) !important;
+}
+
+/* Specific fixes for inline styled avatars */
+[style*="backgroundColor: #3b82f6"] {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+[style*="backgroundColor: rgb(59, 130, 246)"] {
+  background-color: rgb(59, 130, 246) !important;
+  color: white !important;
+}
+
+/* Common avatar color variations */
+.avatar-blue,
+.avatar[style*="3b82f6"] {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+.avatar-red,
+.avatar[style*="ef4444"] {
+  background-color: #ef4444 !important;
+  color: white !important;
+}
+
+.avatar-green,
+.avatar[style*="10b981"] {
+  background-color: #10b981 !important;
+  color: white !important;
+}
+
+.avatar-purple,
+.avatar[style*="8b5cf6"] {
+  background-color: #8b5cf6 !important;
+  color: white !important;
+}
+
+.avatar-orange,
+.avatar[style*="f59e0b"] {
+  background-color: #f59e0b !important;
+  color: white !important;
+}
+
+/* Ensure avatar colors don't get overridden by color switcher */
+.avatar,
+.profile-avatar,
+.user-avatar {
+  /* Prevent color switcher from affecting avatars */
+  background-color: inherit !important;
+  color: inherit !important;
+}
+
+/* Specific styles for your settings page avatar */
+.settings-page .avatar,
+.profile-page .avatar,
+#settings .avatar,
+#profile .avatar {
+  /* Preserve the specific blue color you mentioned */
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 600 !important;
+}
+
+/* Preserve avatar styling during color transitions */
+.avatar {
+  transition: none !important; /* Disable transitions that might cause color loss */
+}
+
+/* Override any color switcher effects on avatars */
+body[class*="color-"] .avatar,
+html[class*="color-"] .avatar {
+  background-color: var(--preserved-avatar-bg, #3b82f6) !important;
+  color: var(--preserved-avatar-color, white) !important;
+}
+
+/* Specific fix for React inline styles */
+div[style*="backgroundColor"][style*="borderRadius: 50%"] {
+  /* This targets your specific avatar styling pattern */
+  background-color: inherit !important;
+  color: inherit !important;
+}

@@ -1,0 +1,43 @@
+{
+  "dashboard": {
+    "welcome": "Welcome",
+    "profile": "Profile",
+    "documents": "Documents",
+    "settings": "Settings",
+    "user_type": "User Type",
+    "id_uploaded": "ID Uploaded",
+    "id_missing": "ID Not Uploaded"
+  },
+  "sign-up": {
+    "title": "Sign Up",
+    "subtitle": "Create your account",
+    "email": "Email",
+    "password": "Password",
+    "confirm_password": "Confirm Password",
+    "mobile_number": "Mobile Number",
+    "sign_up_button": "Sign Up",
+    "already_have_account": "Already have an account?",
+    "sign_in": "Sign In",
+    "terms_agreement": "I agree to the",
+    "terms_conditions": "Terms & Conditions",
+    "privacy_policy": "Privacy Policy",
+    "options": {
+      "Notary": "Notary",
+      "Attorney": "Attorney",
+      "Business": "Business",
+      "Real_Estate_Agent": "Real Estate Agent"
+    }
+  },
+  "sign-in": {
+    "email_label": "Email",
+    "password_label": "Password",
+    "keep_me_logged_in": "Keep me logged in",
+    "sign_in_heading": "Sign In",
+    "signing_in": "Signing in..."
+  },
+  "validation": {
+    "email_required": "Email is required",
+    "email_invalid": "Please enter a valid email address",
+    "password_required": "Password is required"
+  }
+}

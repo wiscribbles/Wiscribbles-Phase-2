@@ -1,0 +1,296 @@
+@import url("https://fonts.googleapis.com/css2?family=Catamaran:wght@400;500;600&family=Kumbh+Sans:wght@400;500;700&family=Merriweather:wght@700&family=Roboto:wght@400;500;700&family=Shadows+Into+Light&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap');
+
+*,
+html {
+  scroll-behavior: smooth !important;
+}
+/* .navigation li ul,
+.navigation li ul li.dropdown ul {
+  display: block !important;
+  overflow: hidden;
+  height: 0px;
+  -webkit-transition: height 0.3s linear, padding-top 0.3s linear;
+}
+.navigation li:hover ul,
+.navigation li ul li.dropdown:hover ul {
+  height: 100px;
+} */
+.navigation li.dropdown > ul {
+  /* display: block !important;
+  max-height: 0;
+  transition-delay: 4s all;
+  transition: max-height 0.35s ease-out, opacity 0.35s; */
+  /* overflow: hidden; */
+  /* opacity: 0; */
+}
+.navigation li.dropdown:hover > ul {
+  display: block;
+  /* max-height: 500px;
+  transition: max-height 0.65s ease-in, opacity 1.65s;
+  opacity: 1; */
+}
+
+.dark-version .dark-logo {
+  display: none;
+}
+.dark-version .light-logo {
+  display: block;
+}
+.light-logo {
+  display: none;
+}
+
+/* Slick slider */
+.slick-dots {
+  display: flex !important;
+}
+.feedback-active .slick-slide {
+  padding: 0 15px;
+}
+
+.page-item .page-link {
+  border-radius: 50% !important;
+}
+
+.product-details-images .nav-link {
+  padding: 0;
+}
+
+/* Navbar fixes */
+.main-menu .navigation {
+  display: flex !important;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  align-items: center;
+}
+
+.main-menu .navigation li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.main-menu .navigation li a {
+  display: block;
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 18px;
+}
+
+.main-menu .navbar-collapse {
+  display: block !important;
+}
+
+/* Ensure Bootstrap navbar collapse works */
+@media (min-width: 992px) {
+  .navbar-collapse {
+    display: flex !important;
+  }
+}
+
+/* Enhanced navbar stability and hover effects */
+.main-menu .navigation li a {
+  position: relative;
+  display: block;
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 18px;
+  min-width: max-content;
+}
+
+/* Simple hover underline effect */
+.main-menu .navigation li a:hover {
+  text-decoration: underline;
+  text-decoration-color: white;
+  text-underline-offset: 4px;
+}
+
+/* Fix for dropdown hover effects */
+.main-menu .navigation li.dropdown ul li a:hover {
+  color: #0066ff;
+  text-decoration: underline;
+  padding-left: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+/* Layout stability fixes */
+.main-header {
+  position: relative;
+  left: 0px;
+  top: 0px;
+  z-index: 999;
+  width: 100%;
+  transition: all 0.3s ease;
+  min-height: 80px; /* Prevent layout shift */
+}
+
+.main-header .header-upper {
+  z-index: 5;
+  width: 100%;
+  position: relative;
+  transition: all 0.3s ease;
+  background: transparent;
+  backdrop-filter: blur(10px);
+}
+
+.main-header .header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 80px;
+}
+
+.main-header .nav-outer {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: center;
+}
+
+/* Ensure navbar container is stable */
+.main-menu .navbar-collapse {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+}
+
+/* Fix container padding consistency */
+.main-header .container-fluid {
+  padding-left: 25px;
+  padding-right: 25px;
+  transition: padding 0.3s ease;
+}
+
+@media only screen and (min-width: 1200px) {
+  .main-header .container-fluid {
+    padding-left: 55px;
+    padding-right: 55px;
+  }
+}
+
+/* Prevent logo shifting */
+.main-header .logo {
+  z-index: 9;
+  padding: 10px 0;
+  position: relative;
+  margin-right: 25px;
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+}
+
+/* Enforce consistent logo sizing across all pages */
+.main-header .logo img {
+  height: 60px;
+  width: auto;
+  max-width: 120px;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Mobile header logo */
+@media (max-width: 991px) {
+  .main-header .navbar-header .mobile-logo img {
+    height: 50px;
+    width: auto;
+    max-width: 100px;
+  }
+}
+
+/* Navbar toggle button consistency */
+.main-menu .navbar-header .navbar-toggle {
+  float: right;
+  padding: 4px 0;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.main-menu .navbar-header .navbar-toggle:hover {
+  transform: scale(1.05);
+}
+
+.main-menu .navbar-header .navbar-toggle .icon-bar {
+  background: #696e7b;
+  height: 2px;
+  width: 30px;
+  display: block;
+  margin: 7px 0;
+  transition: all 0.3s ease;
+}
+
+/* Menu buttons hover effects - only for navbar */
+.main-header .menu-btns .theme-btn {
+  transition: all 0.3s ease;
+  position: relative;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.main-header .menu-btns .theme-btn:hover {
+  text-decoration: underline;
+  text-decoration-color: white;
+  text-underline-offset: 4px;
+}
+
+/* Reset for form buttons to prevent interference */
+.theme-btn:not(.main-header .theme-btn) {
+  white-space: normal !important;
+  font-weight: normal !important;
+}
+
+.theme-btn:not(.main-header .theme-btn):hover {
+  text-decoration: none !important;
+}
+
+/* Fix for absolute positioning issues */
+.main-header.menu-absolute .header-upper {
+  position: absolute;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+/* Dark theme adjustments */
+.dark-version .main-header .header-upper {
+  background: rgba(23, 23, 26, 0.95);
+}
+
+/* Fix responsive navigation */
+@media only screen and (max-width: 991px) {
+  .main-menu .navbar-collapse {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    background: white;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 0 0 10px 10px;
+  }
+  
+  .dark-version .main-menu .navbar-collapse {
+    background: #17171a;
+  }
+  
+  .main-menu .navigation li a:hover {
+    transform: none;
+    padding-left: 1.5rem;
+  }
+}
