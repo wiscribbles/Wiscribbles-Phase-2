@@ -1,124 +1,57 @@
 import { NextResponse } from 'next/server';
+import { requireUser } from '@/lib/serverAuth';
+import { isTrustedDocumentUrl, sanitizeFilename } from '@/lib/apiUtils';
+
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
+async function proxyDocument(documentUrl, rawFileName) {
+  if (!documentUrl) {
+    return NextResponse.json({ error: 'Document URL is required' }, { status: 400 });
+  }
+  if (!isTrustedDocumentUrl(documentUrl)) {
+    return NextResponse.json({ error: 'Invalid document source' }, { status: 403 });
+  }
+
+  const response = await fetch(documentUrl, { redirect: 'error' });
+  if (!response.ok) {
+    return NextResponse.json({ error: 'Failed to fetch document' }, { status: response.status });
+  }
+
+  const contentType = response.headers.get('content-type') || 'application/pdf';
+  const body = await response.arrayBuffer();
+
+  return new NextResponse(body, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${sanitizeFilename(rawFileName)}"`,
+      'Content-Length': body.byteLength.toString(),
+      'Cache-Control': 'private, no-store',
+    },
+  });
+}
 
 export async function GET(request) {
+  const { error: authError } = await requireUser(request);
+  if (authError) return authError;
   try {
     const { searchParams } = new URL(request.url);
-    const documentUrl = searchParams.get('url');
-    const fileName = searchParams.get('filename') || 'document.pdf';
-    
-    if (!documentUrl) {
-      return NextResponse.json(
-        { error: 'Document URL is required' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate the URL is from Cloudinary or your trusted sources
-    const allowedDomains = ['res.cloudinary.com', 'cloudinary.com'];
-    const url = new URL(documentUrl);
-    const isAllowed = allowedDomains.some(domain => url.hostname.includes(domain));
-    
-    if (!isAllowed) {
-      return NextResponse.json(
-        { error: 'Invalid document source' },
-        { status: 403 }
-      );
-    }
-    
-    // Fetch the document from the URL
-    const response = await fetch(documentUrl);
-    
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: 'Failed to fetch document' },
-        { status: response.status }
-      );
-    }
-    
-    // Get the content type from the original response
-    const contentType = response.headers.get('content-type') || 'application/pdf';
-    
-    // Get the document as array buffer
-    const arrayBuffer = await response.arrayBuffer();
-    
-    // Create response with appropriate headers for download
-    return new NextResponse(arrayBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': arrayBuffer.byteLength.toString(),
-        // Cache for 5 minutes
-        'Cache-Control': 'private, max-age=300',
-      },
-    });
-    
+    return await proxyDocument(searchParams.get('url'), searchParams.get('filename'));
   } catch (error) {
     console.error('Error in download-document API:', error);
-    return NextResponse.json(
-      { error: 'Failed to process document download' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to process document download' }, { status: 500 });
   }
 }
 
-// Handle POST requests (if needed for more complex scenarios)
 export async function POST(request) {
+  const { error: authError } = await requireUser(request);
+  if (authError) return authError;
   try {
-    const body = await request.json();
-    const { documentUrl, fileName = 'document.pdf' } = body;
-    
-    if (!documentUrl) {
-      return NextResponse.json(
-        { error: 'Document URL is required' },
-        { status: 400 }
-      );
-    }
-    
-    // Validate the URL is from Cloudinary or your trusted sources
-    const allowedDomains = ['res.cloudinary.com', 'cloudinary.com'];
-    const url = new URL(documentUrl);
-    const isAllowed = allowedDomains.some(domain => url.hostname.includes(domain));
-    
-    if (!isAllowed) {
-      return NextResponse.json(
-        { error: 'Invalid document source' },
-        { status: 403 }
-      );
-    }
-    
-    // Fetch the document
-    const response = await fetch(documentUrl);
-    
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: 'Failed to fetch document' },
-        { status: response.status }
-      );
-    }
-    
-    // Get the content type
-    const contentType = response.headers.get('content-type') || 'application/pdf';
-    
-    // Get the document as array buffer
-    const arrayBuffer = await response.arrayBuffer();
-    
-    // Create response with download headers
-    return new NextResponse(arrayBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': arrayBuffer.byteLength.toString(),
-        'Cache-Control': 'private, max-age=300',
-      },
-    });
-    
+    const { documentUrl, fileName } = await request.json();
+    return await proxyDocument(documentUrl, fileName);
   } catch (error) {
-    console.error('Error in download-document POST:', error);
-    return NextResponse.json(
-      { error: 'Failed to process document download' },
-      { status: 500 }
-    );
+    console.error('Error in download-document API:', error);
+    return NextResponse.json({ error: 'Failed to process document download' }, { status: 500 });
   }
 }

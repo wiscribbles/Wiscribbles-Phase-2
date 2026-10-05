@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from '@/utils/authFetch';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -302,7 +303,7 @@ WiScribbles Team
         console.log('Attempting fallback email method...');
         console.log('Fallback data:', fallbackData);
         
-        const fallbackResponse = await fetch('/api/send-document-email', {
+        const fallbackResponse = await authFetch('/api/send-document-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -532,7 +533,7 @@ WiScribbles Team
         // Use our API endpoint to handle the download
         const apiUrl = `/api/download-document?url=${encodeURIComponent(downloadURL)}&filename=${encodeURIComponent(fileName || `document_${new Date().toISOString().slice(0, 10)}.pdf`)}`;
         
-        const response = await fetch(apiUrl);
+        const response = await authFetch(apiUrl);
         
         if (!response.ok) {
           throw new Error('Failed to fetch document from server');

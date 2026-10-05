@@ -48,7 +48,7 @@ Key runtime: Node.js 18+ (recommended 20 LTS)
 - `lib/supabase.js`: singleton Supabase client from env vars
 
 ### Environment Variables
-Create a `.env` (or environment‑specific `.env.production`) in `SourceCode/` root.
+Create a `.env` (or environment‑specific `.env.production`) in the repository root (see `.env.example`).
 
 Required (Firebase):
 - `NEXT_PUBLIC_FIREBASE_API_KEY`

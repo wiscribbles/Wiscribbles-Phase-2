@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { db } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 // Helper function to fetch document form data from database
 const fetchDocumentFormData = async (documentType, userId, sessionId) => {
@@ -15,10 +14,10 @@ const fetchDocumentFormData = async (documentType, userId, sessionId) => {
     const documentFormId = `${identifier}_${documentType}`;
     console.log('Fetching document form data:', { documentFormId, documentType, userId: userId || 'anonymous' });
 
-    const docRef = doc(db, 'documentForms', documentFormId);
-    const docSnap = await getDoc(docRef);
+    const docRef = adminDb.collection('documentForms').doc(documentFormId);
+    const docSnap = await docRef.get();
 
-    if (docSnap.exists()) {
+    if (docSnap.exists) {
       const data = docSnap.data();
       console.log('Found document form data in database:', Object.keys(data.formData || {}));
       return data.formData || {};
@@ -554,6 +553,9 @@ const generateGenericDocumentPDF = async (pdfDoc, documentType, formData) => {
   y -= lh + 10;
   page.drawText('[Notary Public Seal]', { x: margin, y, size: 12, font });
 };
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(request) {
   try {

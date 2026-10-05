@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { generateReferenceNumber } from '@/lib/referenceNumber';
+import { isTrustedDocumentUrl } from '@/lib/apiUtils';
+import { requireNotary } from '@/lib/serverAuth';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -47,6 +49,7 @@ async function uploadToCloudinary(fileBuffer) {
 }
 
 async function addFooterToPDF(pdfUrl, footerText) {
+  if (!isTrustedDocumentUrl(pdfUrl)) throw new Error('Untrusted document URL');
   try {
     console.log('Attempting to fetch PDF from:', pdfUrl);
     
@@ -107,14 +110,15 @@ async function addFooterToPDF(pdfUrl, footerText) {
   }
 }
 
-function generateReferenceNumber() {
-  const prefix = 'WS';
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `${prefix}${timestamp}${random}`;
-}
+
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(request) {
+  const { error: authError } = await requireNotary(request);
+  if (authError) return authError;
+
   try {
     const { submissionId, notaryId, notaryName } = await request.json();
 
@@ -122,10 +126,10 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Submission ID is required' }, { status: 400 });
     }
 
-    const submissionRef = doc(db, 'formSubmissions', submissionId);
-    const submissionDoc = await getDoc(submissionRef);
+    const submissionRef = adminDb.collection('formSubmissions').doc(submissionId);
+    const submissionDoc = await submissionRef.get();
 
-    if (!submissionDoc.exists()) {
+    if (!submissionDoc.exists) {
       return NextResponse.json({ success: false, error: 'Submission not found' }, { status: 404 });
     }
 
@@ -232,7 +236,7 @@ export async function POST(request) {
       approvedDocURL: approvedDocURL
     };
 
-    await updateDoc(submissionRef, updateData);
+    await submissionRef.update(updateData);
 
     return NextResponse.json({ 
       success: true, 

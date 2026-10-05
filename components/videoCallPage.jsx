@@ -1,5 +1,6 @@
 'use client';
 
+import { authFetch } from '@/utils/authFetch';
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -632,7 +633,7 @@ const VideoCallPage = () => {
     
     try {
       // Call the notary-stamp-pdf API to apply signature and seal
-      const response = await fetch('/api/notary-stamp-pdf', {
+      const response = await authFetch('/api/notary-stamp-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -689,7 +690,7 @@ const VideoCallPage = () => {
     if (submissionData?.id) {
       setIsClientSigning(true);
       try {
-        const response = await fetch('/api/stamp-pdf', {
+        const response = await authFetch('/api/stamp-pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ submissionId: submissionData.id }),

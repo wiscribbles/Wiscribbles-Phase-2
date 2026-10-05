@@ -1,5 +1,6 @@
 'use client';
 
+import { authFetch } from '@/utils/authFetch';
 import React, { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { collection, getDocs, doc, updateDoc, query, where, orderBy, limit } from 'firebase/firestore';
@@ -458,7 +459,7 @@ const NotaryDashboard = () => {
     setSendingEmailId(submission.id);
     try {
       // Call the notarization API which handles PDF stamping and Firebase updates
-      const response = await fetch('/api/notarize', {
+      const response = await authFetch('/api/notarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

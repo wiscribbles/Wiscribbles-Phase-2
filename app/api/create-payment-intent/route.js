@@ -1,32 +1,38 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { requireUser } from '@/lib/serverAuth';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+export const runtime = 'nodejs';
+
+// Server-side price list in the smallest currency unit (cents). The client may
+// only choose WHICH service it wants - never the amount. Adjust to real prices.
+const PRICES_USD_CENTS = {
+  esign: 1500,
+  notary: 3500,
+};
 
 export async function POST(request) {
-  try {
-    const body = await request.json();
-    const { amount, currency = 'usd', payment_method_types = ['card'], billing_details } = body;
+  const { user, error: authError } = await requireUser(request);
+  if (authError) return authError;
 
-    // Create a PaymentIntent with the order amount and currency
+  try {
+    const { serviceType } = await request.json();
+    const amount = PRICES_USD_CENTS[serviceType];
+    if (!amount) {
+      return NextResponse.json({ error: 'Unknown service type' }, { status: 400 });
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
-      currency,
-      payment_method_types,
-      metadata: {
-        integration_check: 'accept_a_payment',
-      },
-      ...(billing_details && { billing_details }),
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+      metadata: { serviceType, uid: user.uid },
     });
 
-    return NextResponse.json({
-      clientSecret: paymentIntent.client_secret,
-    });
+    return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
     console.error('Error creating payment intent:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Could not create payment' }, { status: 500 });
   }
-} 
+}

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request) {
@@ -88,7 +87,7 @@ export async function POST(request) {
     console.log('Saving to Firestore:', formSubmissionData);
 
     // Add the document to Firestore
-    const docRef = await addDoc(collection(db, 'formSubmissions'), formSubmissionData);
+    const docRef = await adminDb.collection('formSubmissions').add(formSubmissionData);
 
     return NextResponse.json({ 
       success: true, 

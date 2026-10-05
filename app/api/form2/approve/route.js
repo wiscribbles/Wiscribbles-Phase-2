@@ -1,20 +1,17 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { escapeHtml, isTrustedDocumentUrl } from '@/lib/apiUtils';
+import { generateReferenceNumber } from '@/lib/referenceNumber';
+import { requireNotary } from '@/lib/serverAuth';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { Resend } from 'resend';
 import { PDFDocument, rgb } from 'pdf-lib';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
-function generateReferenceNumber() {
-  const prefix = 'WS';
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `${prefix}${timestamp}${random}`;
-}
 
 // Function to process and upload approved document to approvedDocument folder
 async function processAndUploadApprovedDocument(originalUrl, footerText, signingOption, referenceNumber, submissionData) {
+  if (!isTrustedDocumentUrl(originalUrl)) throw new Error('Untrusted document URL');
   try {
     console.log('Processing approved document:', originalUrl);
     
@@ -163,15 +160,22 @@ async function processAndUploadApprovedDocument(originalUrl, footerText, signing
   }
 }
 
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 export async function POST(request) {
+  const { error: authError } = await requireNotary(request);
+  if (authError) return authError;
+
   try {
     const { submissionId, approved, notaryId, notaryName } = await request.json();
 
     // Get the submission document
-    const submissionRef = doc(db, 'formSubmissions', submissionId);
-    const submissionDoc = await getDoc(submissionRef);
+    const submissionRef = adminDb.collection('formSubmissions').doc(submissionId);
+    const submissionDoc = await submissionRef.get();
 
-    if (!submissionDoc.exists()) {
+    if (!submissionDoc.exists) {
       return NextResponse.json({ success: false, error: 'Submission not found' }, { status: 404 });
     }
 
@@ -185,16 +189,16 @@ export async function POST(request) {
       
       try {
         // Send email notification
-        await resend.emails.send({
-          from: 'WiScribble <notifications@wiscribble.com>',
+        await getResend().emails.send({
+          from: process.env.EMAIL_FROM,
           to: submission.step1.email,
           subject: 'Your Document Has Been Approved',
           html: `
             <h1>Document Approval Notification</h1>
-            <p>Dear ${submission.step1.firstName} ${submission.step1.lastName},</p>
+            <p>Dear ${escapeHtml(submission.step1.firstName)} ${escapeHtml(submission.step1.lastName)},</p>
             <p>Your document has been approved by our notary team.</p>
-            <p><strong>Reference Number:</strong> ${referenceNumber}</p>
-            <p><strong>Document Type:</strong> ${submission.step2.documentType}</p>
+            <p><strong>Reference Number:</strong> ${escapeHtml(referenceNumber)}</p>
+            <p><strong>Document Type:</strong> ${escapeHtml(submission.step2.documentType)}</p>
             <p>Please keep this reference number for your records. You can use it to track your document status.</p>
             <p>Thank you for using WiScribble!</p>
           `
@@ -245,7 +249,7 @@ export async function POST(request) {
       }
     }
 
-    await updateDoc(submissionRef, updateData);
+    await submissionRef.update(updateData);
 
     return NextResponse.json({ 
       success: true, 

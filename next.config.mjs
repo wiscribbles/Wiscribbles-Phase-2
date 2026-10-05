@@ -23,7 +23,7 @@ const nextConfig = {
   
   // Exclude problematic packages from server-side rendering
   experimental: {
-    serverComponentsExternalPackages: ['pdfjs-dist'],
+    serverComponentsExternalPackages: ['pdfjs-dist', 'firebase-admin', 'pdfkit'],
   },
   
   // Transpile packages if needed (removed pdfjs-dist to avoid conflict)

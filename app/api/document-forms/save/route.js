@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase';
-import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(request) {
   try {
@@ -38,8 +37,8 @@ export async function POST(request) {
     });
 
     // Save to Firebase
-    const docRef = doc(db, 'documentForms', documentFormId);
-    await setDoc(docRef, documentFormData, { merge: true });
+    const docRef = adminDb.collection('documentForms').doc(documentFormId);
+    await docRef.set(documentFormData, { merge: true });
 
     return NextResponse.json({
       success: true,
@@ -97,10 +96,10 @@ export async function GET(request) {
     });
 
     // Get from Firebase
-    const docRef = doc(db, 'documentForms', documentFormId);
-    const docSnap = await getDoc(docRef);
+    const docRef = adminDb.collection('documentForms').doc(documentFormId);
+    const docSnap = await docRef.get();
 
-    if (docSnap.exists()) {
+    if (docSnap.exists) {
       const data = docSnap.data();
       return NextResponse.json({
         success: true,

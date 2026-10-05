@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
-import { getZegoConfig, validateZegoConfig } from '../config/zegoConfig';
+import { fetchZegoKitToken } from '../config/zegoConfig';
 
 const ContainedVideoCall = ({ 
   meetingId, 
@@ -22,23 +22,7 @@ const ContainedVideoCall = ({
     
     const initializeCall = async () => {
       try {
-        // Get ZegoCloud configuration
-        const zegoConfig = getZegoConfig();
-        
-        // Validate configuration
-        if (!validateZegoConfig(zegoConfig)) {
-          if (onError) onError('ZegoCloud configuration is invalid.');
-          setIsLoading(false);
-          return;
-        }
-        
-        const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
-          zegoConfig.appID,
-          zegoConfig.serverSecret,
-          meetingId,
-          userId,
-          userName
-        );
+        const kitToken = await fetchZegoKitToken(ZegoUIKitPrebuilt, meetingId, userName);
         
         const zp = ZegoUIKitPrebuilt.create(kitToken);
         zpRef.current = zp;

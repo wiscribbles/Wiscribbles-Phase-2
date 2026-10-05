@@ -60,14 +60,6 @@ const SafeVideoCall = ({
         
         console.log('✅ Meeting ID format is valid for ZegoCloud:', meetingId);
         
-        // Dynamically import and get config
-        const { getZegoConfig, validateZegoConfig } = await import('../config/zegoConfig');
-        const zegoConfig = getZegoConfig();
-        
-        if (!validateZegoConfig(zegoConfig)) {
-          if (onError) onError('Invalid ZegoCloud configuration');
-          return;
-        }
 
         // Wait for ZegoUIKitPrebuilt to be available
         const ZegoCloudSDK = (await import('@zegocloud/zego-uikit-prebuilt')).ZegoUIKitPrebuilt;
@@ -78,19 +70,13 @@ const SafeVideoCall = ({
           return;
         }
 
-        const kitToken = ZegoCloudSDK.generateKitTokenForTest(
-          zegoConfig.appID,
-          zegoConfig.serverSecret,
-          meetingId,
-          userId,
-          userName
-        );
+        const { fetchZegoKitToken } = await import("../config/zegoConfig");
+        const kitToken = await fetchZegoKitToken(ZegoCloudSDK, meetingId, userName);
 
         const zp = ZegoCloudSDK.create(kitToken);
         
         console.log('🎥 Attempting to join ZegoCloud room:', meetingId);
         console.log('🎥 User details:', { userId, userName });
-        console.log('🎥 ZegoCloud config valid:', zegoConfig);
         
         await zp.joinRoom({
           container: container,

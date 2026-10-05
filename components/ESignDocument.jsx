@@ -1,5 +1,6 @@
 'use client';
 
+import { authFetch } from '@/utils/authFetch';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -108,7 +109,7 @@ const ESignDocument = () => {
     setIsSigningInProgress(true);
     try {
       // Call the stamp-pdf API to apply the signature stamp
-      const response = await fetch('/api/stamp-pdf', {
+      const response = await authFetch('/api/stamp-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

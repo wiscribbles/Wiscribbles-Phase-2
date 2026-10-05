@@ -1,68 +1,58 @@
 import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
+import { requireUser } from '@/lib/serverAuth';
+import { escapeHtml, isTrustedDocumentUrl } from '@/lib/apiUtils';
+
+export const runtime = 'nodejs';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request) {
+  const { error: authError } = await requireUser(request);
+  if (authError) return authError;
+
   try {
-    const body = await request.json();
-    const { 
-      email, 
-      documentUrl, 
-      documentType = 'document',
+    const {
+      email,
+      documentUrl,
       referenceNumber,
       userName = 'User',
-      documentTypeName = 'Document'
-    } = body;
-    
-    // Validate required fields
+      documentTypeName = 'Document',
+    } = await request.json();
+
     if (!email || !documentUrl) {
-      return NextResponse.json(
-        { error: 'Email and document URL are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Email and document URL are required' }, { status: 400 });
     }
-    
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email address' },
-        { status: 400 }
-      );
+    if (!EMAIL_REGEX.test(email)) {
+      return NextResponse.json({ success: false, error: 'Invalid email address' }, { status: 400 });
     }
-    
-    // Log the email sending attempt (for debugging)
-    console.log('=== EMAIL API DEBUG ===');
-    console.log('Sending document to:', email);
-    console.log('Document URL:', documentUrl);
-    console.log('Reference Number:', referenceNumber);
-    
-    // If EmailJS fails, we can implement alternative email sending here
-    // For now, we'll return a success response with instructions
-    
-    // You could integrate with other email services here like:
-    // - SendGrid
-    // - Mailgun
-    // - AWS SES
-    // - Nodemailer with SMTP
-    
-    // For now, return a response that indicates the email would be sent
-    return NextResponse.json({
-      success: true,
-      message: 'Email request processed',
-      fallbackUrl: documentUrl,
-      recipient: email,
-      instructions: `Document link: ${documentUrl}`,
-      // In production, you'd actually send the email here
-      note: 'Email service integration pending. Please use the direct download option for now.'
+    if (!isTrustedDocumentUrl(documentUrl)) {
+      return NextResponse.json({ success: false, error: 'Invalid document source' }, { status: 403 });
+    }
+    if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+      return NextResponse.json({ success: false, error: 'Email service is not configured' }, { status: 503 });
+    }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: `Your ${documentTypeName} is ready`,
+      html: `
+        <p>Dear ${escapeHtml(userName)},</p>
+        <p>Your ${escapeHtml(documentTypeName)} is ready.</p>
+        <p><a href="${escapeHtml(documentUrl)}">Download your document</a></p>
+        ${referenceNumber ? `<p>Reference number: <strong>${escapeHtml(referenceNumber)}</strong></p>` : ''}
+      `,
     });
-    
+    if (error) {
+      console.error('Resend error:', error);
+      return NextResponse.json({ success: false, error: 'Failed to send email' }, { status: 502 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Email sent' });
   } catch (error) {
     console.error('Error in send-document-email API:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to process email request',
-        details: error.message 
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Failed to process email request' }, { status: 500 });
   }
 }

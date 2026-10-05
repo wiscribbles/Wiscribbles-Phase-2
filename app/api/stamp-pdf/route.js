@@ -1,7 +1,8 @@
 
+import { requireUser } from '@/lib/serverAuth';
+import { isTrustedDocumentUrl } from '@/lib/apiUtils';
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -57,6 +58,7 @@ async function addFooterToPDF(pdfUrl, footerText, userSignatures = []) {
   }
   
   // Add retry logic for fetch
+  if (!isTrustedDocumentUrl(pdfUrl)) throw new Error('Untrusted document URL');
   let lastError;
   let response;
   const maxRetries = 3;
@@ -203,7 +205,14 @@ async function addFooterToPDF(pdfUrl, footerText, userSignatures = []) {
   return await pdfDoc.save();
 }
 
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 export async function POST(request) {
+  const { error: authError } = await requireUser(request);
+  if (authError) return authError;
+
   try {
     const { submissionId, userSignatures } = await request.json();
     console.log('Processing submission ID:', submissionId);
@@ -213,10 +222,10 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Submission ID is required' }, { status: 400 });
     }
 
-    const submissionRef = doc(db, 'formSubmissions', submissionId);
-    const submissionDoc = await getDoc(submissionRef);
+    const submissionRef = adminDb.collection('formSubmissions').doc(submissionId);
+    const submissionDoc = await submissionRef.get();
 
-    if (!submissionDoc.exists()) {
+    if (!submissionDoc.exists) {
       return NextResponse.json({ success: false, error: 'Submission not found' }, { status: 404 });
     }
 
@@ -286,7 +295,7 @@ export async function POST(request) {
         updateData.signatureCount = 0;
       }
       
-      await updateDoc(submissionRef, updateData);
+      await submissionRef.update(updateData);
       
       console.log('Firebase updated successfully');
 

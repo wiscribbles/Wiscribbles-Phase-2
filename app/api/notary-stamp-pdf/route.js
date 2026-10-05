@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { requireNotary } from '@/lib/serverAuth';
+import { isTrustedDocumentUrl } from '@/lib/apiUtils';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
@@ -54,6 +55,7 @@ async function addNotaryStampToPDF(pdfUrl, notaryInfo, clientInfo, acknowledgmen
   console.log('Client Info:', clientInfo);
   console.log('Interactive Signatures to place:', notarySignatures);
   
+  if (!isTrustedDocumentUrl(pdfUrl)) throw new Error('Untrusted document URL');
   // Fetch the PDF
   const response = await fetch(pdfUrl);
   if (!response.ok) {
@@ -578,7 +580,14 @@ number ${referenceNumber}`;
   return await pdfDoc.save();
 }
 
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 export async function POST(request) {
+  const { error: authError } = await requireNotary(request);
+  if (authError) return authError;
+
   console.log('=== Notary Stamp PDF API Called ===');
   
   try {
@@ -644,12 +653,12 @@ export async function POST(request) {
       if (sessionId) {
         try {
           // All notary sessions are stored in formSubmissions collection
-          const submissionRef = doc(db, 'formSubmissions', sessionId);
-          const submissionDoc = await getDoc(submissionRef);
+          const submissionRef = adminDb.collection('formSubmissions').doc(sessionId);
+          const submissionDoc = await submissionRef.get();
           
-          if (submissionDoc.exists()) {
+          if (submissionDoc.exists) {
             // Update with notarized document information
-            await updateDoc(submissionRef, {
+            await submissionRef.update({
               notarizedDocURL: notarizedDocUrl,
               notarizedAt: new Date().toISOString(),
               notarizedBy: notaryId,
