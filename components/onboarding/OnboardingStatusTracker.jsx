@@ -15,6 +15,7 @@
 
 import { useState } from 'react';
 import { ACCOUNT_STATUS, STATUS_LABELS, TABS } from '@/lib/roles';
+import AccountTab from './AccountTab';
 
 const TAB_LABELS = {
   [TABS.ACCOUNT]: 'Account',
@@ -170,11 +171,7 @@ export default function OnboardingStatusTracker({
 
       <section className="pt-4" role="tabpanel">
         {activeTab === TABS.ACCOUNT ? (
-          <AccountPanel
-            isWorkingPartner={isWorkingPartner}
-            jurisdictions={jurisdictions}
-            canResubmit={canResubmit}
-          />
+          <AccountTab canEdit />
         ) : (
           <FinancialPanel tab={financialTab} canResubmit={canResubmit} />
         )}
@@ -203,31 +200,6 @@ function Placeholder({ title, items }) {
   );
 }
 
-function AccountPanel({ isWorkingPartner, jurisdictions, canResubmit }) {
-  return (
-    <>
-      {jurisdictions?.length > 0 && (
-        <p className="mb-3">
-          <span className="text-muted">Jurisdictions on file: </span>
-          <strong>{jurisdictions.join(', ')}</strong>
-        </p>
-      )}
-
-      <Placeholder
-        title={canResubmit ? 'Update your details' : 'Your professional details'}
-        items={[
-          isWorkingPartner
-            ? 'Jurisdiction(s) of practice — multi-select, restricted to jurisdictions where electronic notarisation has statutory effect'
-            : 'Business or practice details — not limited to a single jurisdiction',
-          'Identity verification — live photo ID capture and selfie match',
-          isWorkingPartner
-            ? 'Professional certificate upload (PDF or image, 25MB maximum)'
-            : 'Certificate of registration or law-school certificate (PDF or image, 25MB maximum)',
-        ]}
-      />
-    </>
-  );
-}
 
 function FinancialPanel({ tab, canResubmit }) {
   const isPayout = tab === TABS.FINANCIALS;
