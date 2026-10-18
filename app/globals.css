@@ -130,50 +130,104 @@
   z-index: 10;
 }
 
-/* Logo and Image Quality Optimization */
-.logo-image,
-img[alt*="Logo"],
-img[alt*="logo"] {
+/* ------------------------------------------------------------------------- */
+/* Logo                                                                       */
+/*                                                                            */
+/* THIS BLOCK WAS THE "LOGO VISIBILITY" BUG THE PHASE 2 BRIEF REPORTS, and it */
+/* took a replacement rather than a patch. What it used to contain:           */
+/*                                                                            */
+/*   @media (max-width: 768px) {                                              */
+/*     .logo-image { max-width: 100%; height: auto !important; }               */
+/*   }                                                                        */
+/*                                                                            */
+/* `height: auto !important` on a narrow screen. Combined with the `width:     */
+/* auto` the component set inline, that leaves an <img> with no height         */
+/* constraint at all, so it renders at the PNG's natural pixel size — which    */
+/* for these logo files is several hundred pixels tall. On a phone. The logo   */
+/* either blew the header open or pushed the page sideways, which is what      */
+/* "logo visibility" looked like.                                             */
+/*                                                                            */
+/* It was also in an unwinnable fight. Logo.jsx used to inject a <style> into  */
+/* document.head on every render carrying `height: Xpx !important` for the     */
+/* same selector. Two !important height rules, same specificity: the winner    */
+/* is whichever is later in the document, and the injected one was later —     */
+/* until it was torn down on the next render or unmount, at which point        */
+/* `height: auto` took over. The logo's size depended on React's render        */
+/* timing. That injection is gone; see the note at the top of Logo.jsx.        */
+/*                                                                            */
+/* Two more things were wrong here:                                           */
+/*                                                                            */
+/*   `image-rendering: pixelated` — three image-rendering values were          */
+/*   declared in one block and the last one wins, so a logo scaled down from   */
+/*   420px wide was being rendered with smoothing DISABLED. On a logo that is  */
+/*   the opposite of what is wanted and would read as "the logo looks wrong".  */
+/*                                                                            */
+/*   `img[alt*="Logo"], img[alt*="logo"]` — styling every image on the site    */
+/*   whose alt text happens to contain the word "logo". Fragile, and it would  */
+/*   catch unrelated images; a client's document named "logo redesign.pdf"     */
+/*   with a thumbnail would have inherited logo sizing.                        */
+/*                                                                            */
+/* Heights are now keyed on the data-logo-size attribute each instance sets,   */
+/* so two logos at different sizes can sit on one page — which the shared      */
+/* .logo-image selector made impossible. No !important anywhere, because       */
+/* nothing is competing any more.                                             */
+/* ------------------------------------------------------------------------- */
+
+.logo-image {
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  /* Crisp edges on a downscaled raster, without the pixelation. */
   image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-  will-change: transform;
 }
 
-/* High DPI display optimizations */
+.logo-image[data-logo-size='small'] {
+  height: 50px;
+}
+
+.logo-image[data-logo-size='default'] {
+  height: 70px;
+}
+
+.logo-image[data-logo-size='large'] {
+  height: 90px;
+}
+
+@media (max-width: 768px) {
+  .logo-image[data-logo-size='small'] {
+    height: 40px;
+  }
+
+  .logo-image[data-logo-size='default'] {
+    height: 55px;
+  }
+
+  .logo-image[data-logo-size='large'] {
+    height: 70px;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-image[data-logo-size='small'] {
+    height: 34px;
+  }
+
+  .logo-image[data-logo-size='default'] {
+    height: 45px;
+  }
+
+  .logo-image[data-logo-size='large'] {
+    height: 60px;
+  }
+}
+
+/* On a high-DPI screen the browser's own resampling beats any hint we give. */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  .logo-image,
-  img[alt*="Logo"],
-  img[alt*="logo"] {
-    image-rendering: -webkit-optimize-contrast;
+  .logo-image {
     image-rendering: auto;
   }
 }
 
-/* Mobile logo responsive styling */
-@media (max-width: 768px) {
-  .logo-image,
-  img[alt*="Logo"],
-  img[alt*="logo"] {
-    max-width: 100%;
-    height: auto !important;
-    min-height: 40px;
-  }
-  
-  /* Ensure logos don't get too small on very small screens */
-  @media (max-width: 480px) {
-    .logo-image,
-    img[alt*="Logo"],
-    img[alt*="logo"] {
-      min-height: 35px;
-    }
-  }
-}
-
-/* Logo container improvements */
 .logo-link {
   display: inline-block;
   line-height: 0;
