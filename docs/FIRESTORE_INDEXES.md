@@ -7,10 +7,17 @@ This file is where the explanation lives.
 Deploy with:
 
 ```bash
-npm run deploy-rules        # rules + indexes together
+npm run deploy-rules        # rules + indexes + storage rules
 # or
 firebase deploy --only firestore:indexes
 ```
+
+> **Correction.** `deploy-rules` originally ran
+> `firebase deploy --only firestore:rules,storage` — it did **not** include
+> indexes, so following the instruction to "deploy the indexes with
+> `npm run deploy-rules`" would have deployed the rules and quietly skipped
+> every index. The script now includes `firestore:indexes`. If you ran the old
+> version, run `npm run deploy-rules` again.
 
 ## Why these exist at all
 
@@ -68,6 +75,28 @@ absent and Firestore needs the exact combination:
 
 Archived/active is filtered **in memory**, not in the query, precisely to avoid
 doubling that table again. The page size is small enough that it costs nothing.
+
+Three more serve the Website Manager's repository, which filters across all
+accounts rather than one owner:
+
+| Fields | Query it serves |
+|---|---|
+| `jurisdiction`, `createdAt ↓` | Repository filtered by jurisdiction |
+| `status`, `createdAt ↓` | Repository filtered by status |
+| `jurisdiction`, `status`, `createdAt ↓` | Both |
+
+Partner Type and the flagged-only toggle are filtered in memory for the same
+reason as archived/active. The Account Name filter needs no composite index: it
+resolves names to owner ids against `users.nameLower` first (a single-field
+range query, auto-indexed) and then reuses `ownerId`, `createdAt ↓`.
+
+**`nameLower` needs a one-time backfill** on any account created before it
+existed, or the Account Name filter will silently fail to match them:
+
+```bash
+npm run backfill-name-lower -- --dry-run   # see what would change
+npm run backfill-name-lower                # apply
+```
 
 ### `supportTickets`, `users`
 

@@ -101,9 +101,9 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 | File Manager repository | **Done** | `/api/files`. Downloads are 10-minute signed URLs and are audited; nothing is deleted, only archived. |
 | Business role — as Attorney, registration doc instead of law certificate, no jurisdiction limit | **Absent** | Build on Attorney shell. |
 | Website Manager: accept / reject / request more info | **Partial** | `admin/commissioners`, `admin/users`, `AdminService.js` have the shape; the three-way action and feedback loop are not implemented. |
-| Document repository with Jurisdiction / Partner Type / Account Name filters | **Absent** | Build. |
-| Audit, flag suspicious, revoke signed documents | **Absent** | Build. |
-| Sanction / suspend for a period / remove partners | **Absent** | Build. |
+| Document repository with Jurisdiction / Partner Type / Account Name filters | **Done** | `lib/admin/documents.js` + `/admin/documents`. Account Name is a two-step prefix lookup against `users.nameLower` — Firestore has no substring matching, and the UI says what the filter actually matches. |
+| Audit, flag suspicious, revoke signed documents | **Done** | Flag and revoke are deliberately different weights of control. Revocation requires a ground and a written reason, refuses anything not executed, refuses a second revocation, writes a party-readable record, and cannot be undone. |
+| Sanction / suspend for a period / remove partners | **Done** | Stage 3 built the decision; Stage 3b made it end. `suspendedUntil` was being written and never read, so every timed suspension was permanent. It now lapses on the account's next request — `lib/admin/sanctions.js`. |
 | Issue payments for partner balances | **Partial** | `admin/payments` is a stub. |
 
 ### 3. Graphics

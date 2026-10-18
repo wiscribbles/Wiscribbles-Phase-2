@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LayoutDashboard, Users, FileText, CreditCard, ShieldCheck, Settings, LogOut } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Users, FileText, CreditCard, ShieldCheck, Settings, LogOut, UserCheck, FileCheck, Archive } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/firebase';
 import { signOut } from 'firebase/auth';
@@ -21,6 +21,29 @@ const navigationItems = [
     slug: '/users',
     icon: Users,
     description: 'Manage platform members and onboarding',
+  },
+
+  /* Phase 2. These three are the Website Manager's actual working surfaces:
+     the approval queue, the templates every document binds to, and the
+     repository with audit, flag and revoke. They were reachable only by typing
+     the URL until now. */
+  {
+    label: 'Partner Applications',
+    slug: '/partners',
+    icon: UserCheck,
+    description: 'Approve, reject, suspend or request more information',
+  },
+  {
+    label: 'Document Templates',
+    slug: '/templates',
+    icon: FileCheck,
+    description: 'Role and jurisdiction mapping for every document type',
+  },
+  {
+    label: 'Document Repository',
+    slug: '/documents',
+    icon: Archive,
+    description: 'Every executed document, with audit, flag and revoke',
   },
   {
     label: 'Notarizations',

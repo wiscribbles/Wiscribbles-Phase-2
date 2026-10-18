@@ -122,6 +122,12 @@ export async function POST(request) {
   const profile = {
     uid: userRecord.uid,
     name,
+    /* Lower-cased copy, purely so the Website Manager's "Account Name" filter
+       can work. Firestore has no case-insensitive or substring matching, so a
+       prefix query needs a field already in the form being searched. Written
+       here rather than computed at query time because there is nowhere to
+       compute it — the query is the thing that needs it. */
+    nameLower: name.toLowerCase(),
     email,
     role,
     status: initialStatusFor(),
