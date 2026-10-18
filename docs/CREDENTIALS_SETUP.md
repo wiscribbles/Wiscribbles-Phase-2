@@ -112,7 +112,29 @@ You will see a `firebaseConfig` block. Map it across:
 
 Copy the values **without** the surrounding quotes from the JavaScript.
 
+> **These seven values are NOT in the Admin SDK JSON file.** That is the most
+> common point of confusion here, so it is worth stating plainly: the
+> service-account file contains `type`, `project_id`, `private_key_id`,
+> `private_key`, `client_email`, `client_id`, `auth_uri`, `token_uri`,
+> `auth_provider_x509_cert_url`, `client_x509_cert_url` and `universe_domain` —
+> and **none of those are what the `NEXT_PUBLIC_FIREBASE_*` variables want.**
+>
+> Only `project_id` overlaps, and only because it happens to be the same string
+> as `projectId`. `apiKey`, `messagingSenderId` and `appId` exist nowhere until
+> a Web app is registered — if you cannot find them, the Web app has not been
+> created yet. Go back to the start of 2a.
+>
+> **Do not guess `storageBucket`.** Newer projects use
+> `your-project.firebasestorage.app`, older ones `your-project.appspot.com`,
+> and it cannot be inferred from the project ID. It must be copied exactly:
+> uploads fail without it, and the SSRF guard in `lib/apiUtils.js` is bound to
+> that precise string.
+
 ### 2b. Admin SDK key
+
+The downloaded JSON goes into **one variable, whole and unsplit**. Do not pick
+fields out of it — `private_key_id`, `client_id`, `auth_uri`, `token_uri` and
+the rest all stay inside the JSON, where the SDK reads them.
 
 Project settings → **Service accounts** → **Generate new private key**. A JSON
 file downloads.
