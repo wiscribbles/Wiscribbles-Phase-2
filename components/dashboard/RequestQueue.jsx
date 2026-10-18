@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { COLORS, STYLES, pill } from '@/lib/theme';
 
 const formatWait = (seconds) => {
@@ -42,6 +43,7 @@ const CATEGORY_LABELS = {
 };
 
 export default function RequestQueue({ isOnline, locale }) {
+  const router = useRouter();
   const [state, setState] = useState(null);
   const [acting, setActing] = useState(null);
   const [error, setError] = useState(null);
@@ -72,6 +74,41 @@ export default function RequestQueue({ isOnline, locale }) {
     timer.current = setInterval(load, state?.pollMs ?? 5000);
     return () => clearInterval(timer.current);
   }, [isOnline, state?.pollMs, load]);
+
+  /**
+   * Open the session for an entry this professional holds.
+   *
+   * A queue entry id is not a session id. The session has to be created (or
+   * found, if it already exists) by the server, which runs the jurisdiction
+   * lockout as it does so — so this is a POST and not a link. Linking straight
+   * to a session route with an entry id, which an earlier draft of this file
+   * did, would 404 at best and skip the lockout at worst.
+   */
+  const openSession = async (entryId) => {
+    setActing(`${entryId}:open`);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(payload.message ?? 'The session could not be opened.');
+        load();
+        return;
+      }
+
+      router.push(`/${locale}/session/${payload.sessionId}`);
+    } catch {
+      setError('Could not reach the server.');
+    } finally {
+      setActing(null);
+    }
+  };
 
   const act = async (entryId, action) => {
     setActing(`${entryId}:${action}`);
@@ -137,13 +174,19 @@ export default function RequestQueue({ isOnline, locale }) {
             </div>
 
             <div className="d-flex gap-2 mt-3 flex-wrap">
-              <a
+              <button
+                type="button"
                 className="btn"
-                href={`/${locale}/session/${active.id}`}
+                onClick={() => openSession(active.id)}
+                disabled={acting === `${active.id}:open`}
                 style={STYLES.buttonPrimary}
               >
-                {active.status === 'in_session' ? 'Rejoin session' : 'Open session'}
-              </a>
+                {acting === `${active.id}:open`
+                  ? 'Opening…'
+                  : active.status === 'in_session'
+                    ? 'Rejoin session'
+                    : 'Open session'}
+              </button>
               <button
                 type="button"
                 className="btn btn-link text-muted"

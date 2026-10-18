@@ -88,10 +88,10 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 | Go Live / Offline toggle → realtime status | **Done** | `lib/availability.js` + `/api/partner/availability`. Server-written only, with a 2-minute presence TTL and a 1-minute heartbeat, so a closed laptop stops receiving work. |
 | Jurisdiction-based waiting queue, realtime | **Done** | `lib/queue.js` + `/api/partner/queue`, polled at 5s. Polled rather than `onSnapshot` so client identities can be redacted server-side until acceptance. |
 | Accept Client / Decline Request | **Done** | `/api/partner/queue/claim`, both as Firestore transactions so two notaries cannot claim one client. Audited. |
-| Session: Zego SDK + PDF viewer embedded | **Partial** | `SafeVideoCall.jsx`, `ContainedVideoCall.jsx`, `PDFViewer.jsx` exist separately; never composed into one session view. |
-| **Jurisdiction lockout — session must not proceed on mismatch** | **Partial** | Enforced server-side inside the accept transaction, and refusals are audited. The in-session display check lands with the session view (Stage 6). |
+| Session: Zego SDK + PDF viewer embedded | **Done** | `components/session/SessionView.jsx` — the composition Phase 1 never made. UIKit Prebuilt in a panel with sharing/chat/layout controls off, PDF beside it. |
+| **Jurisdiction lockout — session must not proceed on mismatch** | **Done** | Four server-side gates: request, accept, session creation, execution. The session banner displays the *recorded* server result with the statute, not a browser re-check. |
 | Earnings / payouts view | **Parked** | Deliberately not built against a guess at the provider. The Financials tab says what it is waiting for. |
-| Virtual stamp (e-seal) module | **Partial** | `api/notary-stamp-pdf`, `api/stamp-pdf` exist. No stamp creation, no seal asset, no authority binding. |
+| Virtual stamp (e-seal) module | **Done** | `lib/stamp.js`. Reads the PDF from Storage **by path**, not by a client-supplied URL as the Phase 1 routes did. Certificate on its own appended page so execution clauses are never covered; seal mark, per-page footer, and the statutory authority written onto the instrument. |
 | COaths — identical to Notary | **Absent** | Role does not exist. |
 | Attorney 7 tabs (Account, Appointment, Social Media, Analytics, Support, Invoice, File Manager) | **Done** | Six working; Invoice is a `ParkedTab`. |
 | Attorney pre-approval: Account + Invoice only | **Absent** | Build. |
@@ -127,13 +127,13 @@ credentials.
 | Platform fee collection (Stripe) | **Absent** | Stripe Billing subscriptions. |
 | Revenue distribution (Stripe Connect) | **Absent** | Connect Express onboarding + transfers. |
 | KYC replacement | **Absent** | Adapter + Didit. |
-| PDF stamping, core PDF uneditable, upload must be PDF | **Partial** | Libraries present; stamping endpoints are stubs. Replaces the entire `form-step1..5` + `documentTypes.js` input model. |
+| PDF stamping, core PDF uneditable, upload must be PDF | **Done** | PDF only, enforced server-side against Storage metadata. Rejected with the reason: a conversion step between what the client approved and what the notary seals is a gap nobody can audit. |
 | ZegoCloud video | **Partial** | Works; server secret must move server-side. |
-| Workflow order: Personal Info → Doc Selection → Signature & Notarization → Payment → Download | **Partial** | Five steps exist in a different order and shape. |
+| Workflow order: Personal Info → Doc Selection → Signature & Notarization → Payment → Download | **Done** | `components/client/RequestWizard.jsx`. Jurisdiction and service are chosen **before** the upload, so a refusal happens before the client has uploaded or paid anything. |
 | COaths as distinct role everywhere | **Absent** | Build. |
-| T&Cs checkbox at Document Selection | **Absent** | Build. |
-| Disclaimer pop-up before upload, jurisdiction-specific | **Absent** | Build. |
-| Document-to-role and document-to-jurisdiction mapping via admin templates | **Absent** | Template system with role + jurisdiction tick boxes; every uploaded document must bind to a template. |
+| T&Cs checkbox at Document Selection | **Done** | Recorded to `/acceptances` with the text VERSION accepted, immutable. A tick box that gates a button and is then forgotten proves nothing. |
+| Disclaimer pop-up before upload, jurisdiction-specific | **Done** | Versioned constants in `lib/clientRequests.js`, not component text — text in a component changes silently on deploy and takes the meaning of every past acceptance with it. |
+| Document-to-role and document-to-jurisdiction mapping via admin templates | **Done** | `lib/templates.js` + `/admin/templates`. Unavailable types are shown to the client **with their reason** rather than filtered out — an empty list reads as a broken website. |
 | Document revocation (paid), multi-party KYC opt-in, auth code returns "Revoked" | **Absent** | `authenticate/` verification flow exists to extend. |
 
 **Count: 7 partial-and-usable, 12 partial-needs-rework, 30 absent.**

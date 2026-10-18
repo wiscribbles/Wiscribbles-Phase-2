@@ -255,6 +255,21 @@ service cloud.firestore {
     }
 
     /* --------------------------------------------------------------------- */
+    /* acceptances                                                            */
+    /* What each party agreed to, and WHICH VERSION of the text they agreed   */
+    /* to. A tick box that gates a button and is then forgotten proves        */
+    /* nothing; this is the record. Server-written, and immutable — an        */
+    /* acceptance that could be edited afterwards is not evidence of what     */
+    /* anyone was shown.                                                      */
+    /* --------------------------------------------------------------------- */
+
+    match /acceptances/{acceptanceId} {
+      allow get: if isAdmin() || (signedIn() && resource.data.uid == uid());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
     /* supportTickets                                                         */
     /* --------------------------------------------------------------------- */
 
