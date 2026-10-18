@@ -23,6 +23,8 @@ import {
   submitRequest,
 } from '@/lib/clientRequests';
 import { FeeError, quote } from '@/lib/fees';
+import { SigningError } from '@/lib/signing';
+import { remoteWitnessingEnabled } from '@/lib/jurisdictions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,6 +67,9 @@ export async function GET(request) {
             signatories: Number(searchParams.get('signatories') ?? 1),
             witnesses: Number(searchParams.get('witnesses') ?? 0),
             seals: Number(searchParams.get('seals') ?? 1),
+            witnessingAvailable: remoteWitnessingEnabled(
+              searchParams.get('jurisdiction') ?? '',
+            ),
           }),
         });
       } catch (error) {
@@ -175,6 +180,7 @@ export async function POST(request) {
         signatories: Number(body?.signatories ?? 1),
         witnesses: Number(body?.witnesses ?? 0),
         seals: Number(body?.seals ?? 1),
+        parties: Array.isArray(body?.parties) ? body.parties : [],
         acceptances: {
           termsVersion: String(body?.acceptances?.termsVersion ?? ''),
           disclaimerVersion: String(body?.acceptances?.disclaimerVersion ?? ''),
@@ -184,6 +190,15 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, ...result });
     } catch (error) {
       if (error instanceof RequestError) return requestError(error);
+      /* buildParties throws on a bad or duplicated email address. Surfaced as
+         a field error so the wizard can point at the party list rather than
+         showing a generic failure. */
+      if (error instanceof SigningError) {
+        return NextResponse.json(
+          { error: error.code, message: error.message, field: error.field ?? 'parties' },
+          { status: error.status },
+        );
+      }
       throw error;
     }
   } catch (error) {

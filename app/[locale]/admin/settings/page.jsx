@@ -183,7 +183,7 @@ const AdminSettingsPage = () => {
                 <div className="form-check">
                   <input className="form-check-input" type="checkbox" value="" id="autoArchive" disabled />
                   <label className="form-check-label text-muted" htmlFor="autoArchive">
-                    Auto-archive video recordings after compliance export (coming soon)
+                    Auto-archive executed documents after their retention period (coming soon)
                   </label>
                 </div>
               </fieldset>

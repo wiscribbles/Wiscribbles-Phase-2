@@ -183,6 +183,10 @@ export async function POST(request) {
           status: 'notarised',
           referenceNumber,
           stampedPath: sealed.path,
+          /* Stored so anyone holding the file can later demonstrate it has not
+             changed — the integrity test Barbados s.9(3)(a) and Trinidad
+             s.12(2) actually pose. */
+          integrity: sealed.integrity,
           pageCount: sealed.pageCount,
           executedAt,
           executedBy: {

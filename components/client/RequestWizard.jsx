@@ -40,11 +40,24 @@ export default function RequestWizard({ locale }) {
   const [upload, setUpload] = useState(null); // { path, bytes, name }
   const [documentName, setDocumentName] = useState('');
 
-  /* Who is involved, and how many seals. These drive the fee AND how many
-     people the session has to admit — a notarisation with two signatories and
-     a witness is four people in the room, not two. */
-  const [parties, setParties] = useState({ signatories: 1, witnesses: 0, seals: 1 });
+  /* The actual people, not just counts.
+   *
+   * Phase 2 originally asked "how many signatories?" and nothing more, which
+   * priced the document correctly and left the platform unable to invite
+   * anyone. Each party now has a name, an email and a role; they sign one at a
+   * time, in order, and the counts the fee needs are derived from the list
+   * rather than typed separately — so the price can never disagree with the
+   * number of people actually invited.
+   *
+   * The creator is party 1 and is added server-side, so this list is "everyone
+   * else". */
+  const [otherParties, setOtherParties] = useState([]);
+  const [seals, setSeals] = useState(1);
   const [feeQuote, setFeeQuote] = useState(null);
+
+  const signatoryCount =
+    1 + otherParties.filter((p) => p.role !== 'witness' && p.email.trim()).length;
+  const witnessCount = otherParties.filter((p) => p.role === 'witness' && p.email.trim()).length;
 
   useEffect(() => {
     (async () => {
@@ -113,9 +126,10 @@ export default function RequestWizard({ locale }) {
         const query = new URLSearchParams({
           quote: '1',
           notarized: String(notarized),
-          signatories: String(parties.signatories),
-          witnesses: String(parties.witnesses),
-          seals: String(parties.seals),
+          signatories: String(signatoryCount),
+          witnesses: String(witnessCount),
+          seals: String(seals),
+          jurisdiction: choice.jurisdiction || '',
         });
         const response = await fetch(`/api/documents/request?${query}`, { cache: 'no-store' });
         const payload = await response.json().catch(() => ({}));
@@ -124,7 +138,7 @@ export default function RequestWizard({ locale }) {
         setFeeQuote(null);
       }
     })();
-  }, [notarized, parties, choice.requestedService]);
+  }, [notarized, signatoryCount, witnessCount, seals, choice.requestedService, choice.jurisdiction]);
 
   const go = (direction) => {
     const index = STEPS.indexOf(step);
@@ -171,9 +185,12 @@ export default function RequestWizard({ locale }) {
           templateId: choice.templateId,
           storagePath: upload?.path,
           name: documentName,
-          signatories: parties.signatories,
-          witnesses: parties.witnesses,
-          seals: parties.seals,
+          signatories: signatoryCount,
+          witnesses: witnessCount,
+          seals,
+          parties: otherParties
+            .filter((p) => p.email.trim())
+            .map((p) => ({ name: p.name, email: p.email, role: p.role })),
           acceptances: {
             termsVersion: options.termsVersion,
             disclaimerVersion: options.disclaimer.version,
@@ -553,79 +570,135 @@ export default function RequestWizard({ locale }) {
           {/* ---- who is involved ---- */}
           <fieldset className="mb-3">
             <legend className="form-label" style={{ fontWeight: 500, fontSize: '1rem' }}>
-              Who is involved?
+              Who else signs this?
             </legend>
+            <p style={{ ...STYLES.lede, fontSize: '0.84rem' }}>
+              You are the first signatory. Add anyone else who has to sign or
+              witness. They each sign in turn, when they can — nobody has to be
+              available at the same time as anyone else, and they do not need a
+              WiScribbles account.
+            </p>
 
-            <div className="row g-3" style={{ maxWidth: 560 }}>
-              <div className="col-6 col-md-4">
-                <label className="form-label" htmlFor="req-signatories" style={{ fontSize: '0.86rem' }}>
-                  Signatories
+            {otherParties.map((party, index) => (
+              <div className="row g-2 mb-2 align-items-start" key={index} style={{ maxWidth: 640 }}>
+                <div className="col-12 col-sm-4">
+                  <input
+                    className="form-control"
+                    value={party.name}
+                    onChange={(e) => {
+                      const next = [...otherParties];
+                      next[index] = { ...party, name: e.target.value };
+                      setOtherParties(next);
+                    }}
+                    placeholder="Name"
+                    aria-label={`Party ${index + 2} name`}
+                  />
+                </div>
+                <div className="col-12 col-sm-4">
+                  <input
+                    className="form-control"
+                    type="email"
+                    value={party.email}
+                    onChange={(e) => {
+                      const next = [...otherParties];
+                      next[index] = { ...party, email: e.target.value };
+                      setOtherParties(next);
+                    }}
+                    placeholder="Email address"
+                    aria-label={`Party ${index + 2} email`}
+                  />
+                </div>
+                <div className="col-8 col-sm-3">
+                  <select
+                    className="form-select"
+                    value={party.role}
+                    onChange={(e) => {
+                      const next = [...otherParties];
+                      next[index] = { ...party, role: e.target.value };
+                      setOtherParties(next);
+                    }}
+                    aria-label={`Party ${index + 2} role`}
+                  >
+                    <option value="signatory">Signatory</option>
+                    <option value="witness">Witness</option>
+                  </select>
+                </div>
+                <div className="col-4 col-sm-1">
+                  <button
+                    type="button"
+                    className="btn btn-link text-muted px-0"
+                    onClick={() => setOtherParties(otherParties.filter((_, i) => i !== index))}
+                    aria-label={`Remove party ${index + 2}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {otherParties.length < 9 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-link px-0"
+                onClick={() =>
+                  setOtherParties([...otherParties, { name: '', email: '', role: 'signatory' }])
+                }
+              >
+                + Add a party
+              </button>
+            )}
+
+            {errors.parties && <div className="text-danger small mt-1">{errors.parties}</div>}
+
+            {/* A witness cannot attest over video in any of our jurisdictions.
+                Said here, at the moment the witness is added, rather than
+                discovered at signing time. */}
+            {witnessCount > 0 && (
+              <div
+                className="p-3 mt-3"
+                style={{
+                  ...STYLES.card,
+                  background: COLORS.warningBg,
+                  borderLeft: `4px solid ${COLORS.warning}`,
+                }}
+              >
+                <p className="mb-0" style={{ fontSize: '0.84rem', color: COLORS.warningText, lineHeight: 1.7 }}>
+                  <strong>A witness has to be physically present.</strong> None of
+                  the electronic transactions Acts in our jurisdictions turns
+                  &ldquo;in the presence of&rdquo; into &ldquo;over video&rdquo;, so a
+                  witness cannot attest online. Everyone else can still sign here;
+                  we will tell you how to arrange the witnessing. Witnesses are not
+                  charged while this is the case.
+                </p>
+              </div>
+            )}
+
+            {notarized && (
+              <div className="mt-3" style={{ maxWidth: 200 }}>
+                <label className="form-label" htmlFor="req-seals" style={{ fontSize: '0.86rem' }}>
+                  Notarial seals
                 </label>
                 <input
-                  id="req-signatories"
+                  id="req-seals"
                   type="number"
                   className="form-control"
                   min={1}
-                  max={options.priceList?.limits?.MAX_SIGNATORIES ?? 10}
-                  value={parties.signatories}
-                  onChange={(e) =>
-                    setParties({ ...parties, signatories: Math.max(1, Number(e.target.value) || 1) })
-                  }
+                  max={options.priceList?.limits?.MAX_SEALS ?? 5}
+                  value={seals}
+                  onChange={(e) => setSeals(Math.max(1, Number(e.target.value) || 1))}
                 />
                 <p className="mb-0 mt-1" style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}>
-                  Including you.
+                  Usually one.
                 </p>
               </div>
-
-              {notarized && (
-                <>
-                  <div className="col-6 col-md-4">
-                    <label className="form-label" htmlFor="req-witnesses" style={{ fontSize: '0.86rem' }}>
-                      Witnesses
-                    </label>
-                    <input
-                      id="req-witnesses"
-                      type="number"
-                      className="form-control"
-                      min={0}
-                      max={options.priceList?.limits?.MAX_WITNESSES ?? 4}
-                      value={parties.witnesses}
-                      onChange={(e) =>
-                        setParties({ ...parties, witnesses: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                    />
-                    <p className="mb-0 mt-1" style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}>
-                      If the document needs them.
-                    </p>
-                  </div>
-
-                  <div className="col-6 col-md-4">
-                    <label className="form-label" htmlFor="req-seals" style={{ fontSize: '0.86rem' }}>
-                      Seals
-                    </label>
-                    <input
-                      id="req-seals"
-                      type="number"
-                      className="form-control"
-                      min={1}
-                      max={options.priceList?.limits?.MAX_SEALS ?? 5}
-                      value={parties.seals}
-                      onChange={(e) =>
-                        setParties({ ...parties, seals: Math.max(1, Number(e.target.value) || 1) })
-                      }
-                    />
-                    <p className="mb-0 mt-1" style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}>
-                      Usually one.
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
+            )}
 
             {feeQuote && (
-              <p className="mb-0 mt-2" style={{ fontSize: '0.86rem', color: COLORS.inkSubtle }}>
-                Fee so far: <strong>{feeQuote.formattedTotal}</strong> — itemised on the
-                next step.
+              <p className="mb-0 mt-3" style={{ fontSize: '0.86rem', color: COLORS.inkSubtle }}>
+                {signatoryCount} signator{signatoryCount === 1 ? 'y' : 'ies'}
+                {witnessCount > 0 && `, ${witnessCount} witness${witnessCount === 1 ? '' : 'es'}`}
+                {' — fee so far '}
+                <strong>{feeQuote.formattedTotal}</strong>, itemised on the next step.
               </p>
             )}
           </fieldset>

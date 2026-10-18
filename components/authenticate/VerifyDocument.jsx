@@ -297,6 +297,7 @@ export default function VerifyDocument() {
                               ['Executed by', certificate.executedBy],
                               ['Capacity', certificate.capacity],
                               ['Signatories', certificate.signatories],
+                              ['Integrity digest', certificate.integrityDigestShort],
                               ['Witnesses', certificate.witnesses],
                               [
                                 'Revoked on',
@@ -324,6 +325,25 @@ export default function VerifyDocument() {
                         {/* What a verification does NOT give you. Said plainly,
                             because a verifier expecting the file otherwise
                             reads the absence as a broken page. */}
+                        {certificate?.integrityDigest && (
+                          <p
+                            className="mb-0 mt-3"
+                            style={{
+                              fontSize: '0.78rem',
+                              color: COLORS.inkMuted,
+                              wordBreak: 'break-all',
+                              lineHeight: 1.6,
+                            }}
+                          >
+                            Full {certificate.integrityAlgorithm?.toUpperCase()}:{' '}
+                            <code>{certificate.integrityDigest}</code>
+                            <span className="d-block mt-1">
+                              Recompute this over the PDF you hold. If it matches, your
+                              copy is byte-identical to the document that was executed.
+                            </span>
+                          </p>
+                        )}
+
                         {outcome.result === 'valid' && (
                           <p
                             className="mb-0 mt-3"
