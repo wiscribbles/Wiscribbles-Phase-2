@@ -2,10 +2,12 @@
 import Counter from "@/components/Counter";
 import Layout from "@/layout/Layout";
 import PageBanner from "@/layout/PageBanner";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { notarizeNow } from "@/lib/routes";
 import Link from "next/link";
 const About = () => {
   const t = useTranslations();
+  const locale = useLocale();
 
   return (
     <Layout footer={1}>
@@ -51,7 +53,8 @@ const About = () => {
                   </div>
                 </div>
                 <div className="ww-do-btns">
-                  <Link legacyBehavior href="/about">
+                  {/* Was `/about` — the page it is already on. */}
+                  <Link legacyBehavior href={notarizeNow(locale)}>
                     <a className="theme-btn mt-15" style={{ color: '#FFFFFF' }}>
                       {t("about_us_notarize_now")}{" "}
                       <i className="fas fa-angle-double-right" />

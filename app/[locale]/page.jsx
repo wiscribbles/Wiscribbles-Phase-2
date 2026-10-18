@@ -4,6 +4,7 @@ import Hero1 from "@/components/home1/Hero1";
 import Layout from "@/layout/Layout";
 import SideBar from "@/layout/SideBar";
 import { sideBarToggle } from "@/utility";
+import { notarizeNow } from "@/lib/routes";
 import { useTranslations } from "next-intl";
 import Head from "next/head";
 import Link from "next/link";
@@ -468,7 +469,9 @@ const IndexOnePage = ({ params }) => {
               </div>
               {/* Menu Button */}
               <div className="menu-btns">
-                <Link href={`/${locale}/signIn`} className="theme-btn style-three">
+                {/* Was `/${locale}/signIn` — a sign-in page, and the casing
+                    did not match the real route (/auth/signin). */}
+                <Link href={notarizeNow(locale)} className="theme-btn style-three">
                     {t("navbar.pill-button")}{" "}
                     <i className="fas fa-angle-double-right" />
                 </Link>

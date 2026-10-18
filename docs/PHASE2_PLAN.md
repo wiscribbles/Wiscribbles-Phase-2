@@ -69,21 +69,21 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 
 | Requirement | State | Work |
 |---|---|---|
-| Public endpoint collects name, email, password only | **Partial** | `SignUpForm2.jsx` collects ~15 fields incl. ID upload, certificate, card number, jurisdiction, DOB, phone. Strip to four. |
-| Dashboard access only after email verification | **Absent** | No `emailVerified` check anywhere. Needs verification send, callback, and a server-side gate. |
-| Admin panel controls correspond to role at sign-up | **Partial** | Role is stored; nothing downstream reads it for admin control. |
+| Public endpoint collects name, email, password only | **Done** | `SignUpForm2.jsx` deleted — it was writing raw card numbers to Firestore. `components/auth/SignUpForm.jsx` collects name, email, password, role. |
+| Dashboard access only after email verification | **Done** | `requireVerifiedUser` in `lib/auth/server.js`, enforced server-side on every dashboard route. |
+| Admin panel controls correspond to role at sign-up | **Done** | Role lives in auth custom claims, read by the middleware, the server guards and `firestore.rules`. |
 
 ### 2. Administrative dashboards
 
 | Requirement | State | Work |
 |---|---|---|
-| Notary pre-approval: restrict to Account + Financials | **Absent** | Build. |
-| Redirect `pending_review` → `/onboarding/verification` | **Absent** | Route does not exist. Build + server guard. |
-| Jurisdiction(s) of practice capture | **Partial** | Collected at sign-up as a single value; needs to move to Account tab and become multi-select. |
-| KYC trigger from Account tab | **Absent** | Build on the new adapter. |
+| Notary pre-approval: restrict to Account + Financials | **Done** | `TAB_MATRIX` in `lib/roles.js`; the nav and the per-tab guard read the same function. |
+| Redirect `pending_review` → `/onboarding/verification` | **Done** | `requirePartner`, plus the `/dashboard` dispatcher, which sends them there before the flicker. |
+| Jurisdiction(s) of practice capture | **Done** | Multi-select on the Account tab, validated against `lib/jurisdictions`, frozen on approval. |
+| KYC trigger from Account tab | **Done** | `lib/kyc/*` adapter with Didit wired; `/api/kyc/start` + HMAC-verified webhook. |
 | Certificate upload, 25MB cap | **Done** | Cloudinary removed entirely. `/api/uploads` authenticates the caller, enforces the 25MB cap and the permitted content types, and derives the storage path from the session rather than from the request. `storage.rules` enforces the same limits on any direct client write. |
-| Bank capture + tokenization (Financials) | **Absent** | Stripe Connect onboarding. |
-| Status tracker + `admin_feedback` + resubmission | **Absent** | Build. |
+| Bank capture + tokenization (Financials) | **Parked** | Deliberately not collecting bank details until the Stripe-vs-WiPay payout question is settled, so nobody enters them twice into two providers. |
+| Status tracker + `admin_feedback` + resubmission | **Done** | `OnboardingStatusTracker`; saving while `more_info_requested` returns to the queue and clears the feedback. |
 | Notary post-approval: Account / Analytics / Support / Financials | **Done** | All four built. Financials is a `ParkedTab` pending the transmission decision. |
 | Go Live / Offline toggle → realtime status | **Done** | `lib/availability.js` + `/api/partner/availability`. Server-written only, with a 2-minute presence TTL and a 1-minute heartbeat, so a closed laptop stops receiving work. |
 | Jurisdiction-based waiting queue, realtime | **Done** | `lib/queue.js` + `/api/partner/queue`, polled at 5s. Polled rather than `onSnapshot` so client identities can be redacted server-side until acceptance. |
@@ -92,19 +92,19 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 | **Jurisdiction lockout — session must not proceed on mismatch** | **Done** | Four server-side gates: request, accept, session creation, execution. The session banner displays the *recorded* server result with the statute, not a browser re-check. |
 | Earnings / payouts view | **Parked** | Deliberately not built against a guess at the provider. The Financials tab says what it is waiting for. |
 | Virtual stamp (e-seal) module | **Done** | `lib/stamp.js`. Reads the PDF from Storage **by path**, not by a client-supplied URL as the Phase 1 routes did. Certificate on its own appended page so execution clauses are never covered; seal mark, per-page footer, and the statutory authority written onto the instrument. |
-| COaths — identical to Notary | **Absent** | Role does not exist. |
+| COaths — identical to Notary | **Done** | `ROLES.COATH` throughout; one dashboard component serves both, differing only in which service type the queue matches. |
 | Attorney 7 tabs (Account, Appointment, Social Media, Analytics, Support, Invoice, File Manager) | **Done** | Six working; Invoice is a `ParkedTab`. |
-| Attorney pre-approval: Account + Invoice only | **Absent** | Build. |
-| Attorney subscription via card (Invoice tab) | **Absent** | Stripe Billing. |
+| Attorney pre-approval: Account + Invoice only | **Done** | Same `TAB_MATRIX`. |
+| Attorney subscription via card (Invoice tab) | **Parked** | Stripe Checkout is built (`lib/payments/stripe.js`, plans in `lib/plans.js`) but not switched on: collecting before the platform can pay out is the wrong way round. |
 | Appointment scheduling, max 24h window, e-sign vs notarise vs COath | **Done** | `lib/appointments.js`. "Max 24h" read as a booking horizon — see the note in that file. Refuses notarisation in e-signature-only jurisdictions. |
 | Social media signing-link generation | **Done** | `lib/signingLinks.js`. Only a SHA-256 digest is stored, so a link is shown once and cannot be recovered — reissued instead. Every link expires; all are revocable. |
 | File Manager repository | **Done** | `/api/files`. Downloads are 10-minute signed URLs and are audited; nothing is deleted, only archived. |
-| Business role — as Attorney, registration doc instead of law certificate, no jurisdiction limit | **Absent** | Build on Attorney shell. |
-| Website Manager: accept / reject / request more info | **Partial** | `admin/commissioners`, `admin/users`, `AdminService.js` have the shape; the three-way action and feedback loop are not implemented. |
+| Business role — as Attorney, registration doc instead of law certificate, no jurisdiction limit | **Done** | `SubscriberDashboard` serves both; `JURISDICTION_BOUND_ROLES` excludes them. |
+| Website Manager: accept / reject / request more info | **Done** | `lib/admin/partners.js` — status, then claims, then audit, then email, with claims-drift logged loudly if the claim write fails after the Firestore write. |
 | Document repository with Jurisdiction / Partner Type / Account Name filters | **Done** | `lib/admin/documents.js` + `/admin/documents`. Account Name is a two-step prefix lookup against `users.nameLower` — Firestore has no substring matching, and the UI says what the filter actually matches. |
 | Audit, flag suspicious, revoke signed documents | **Done** | Flag and revoke are deliberately different weights of control. Revocation requires a ground and a written reason, refuses anything not executed, refuses a second revocation, writes a party-readable record, and cannot be undone. |
 | Sanction / suspend for a period / remove partners | **Done** | Stage 3 built the decision; Stage 3b made it end. `suspendedUntil` was being written and never read, so every timed suspension was permanent. It now lapses on the account's next request — `lib/admin/sanctions.js`. |
-| Issue payments for partner balances | **Partial** | `admin/payments` is a stub. |
+| Issue payments for partner balances | **Parked** | Same reason as the Financials tab. |
 
 ### 3. Graphics
 
@@ -112,7 +112,7 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 |---|---|---|
 | Logo visibility fix | **Needs live reproduction** | `Logo.jsx` injects a `<style>` element into `document.head` on every mount and removes it on unmount — with two logos mounted, the first unmount strips the shared styles. Likely cause; needs confirming against the live site. |
 | Heading images rendering as square boxes | **Root cause found and fixed** | Not missing images — missing **icon webfonts**. The headings use `<i className="flaticon-*">` and FontAwesome glyphs; when the webfont fails to load the browser renders the tofu box. `public/assets/v1/fonts` and `v2/fonts` were each missing five FontAwesome files including `fa-solid-900.{eot,ttf,svg}`, and `_bootstrap-icons.scss` pointed `$bootstrap-icons-font-dir` at `"../../fonts"` while every sibling partial uses `"../fonts"`, resolving outside `public/assets` entirely. Both fixed. Verify against the live site. |
-| "Notarize Now" button routes to wrong page | **Partial** | Label lives in `locales/en.json` (3 places); the `href` is hard-coded at each call site. Needs a single route constant. |
+| "Notarize Now" button routes to wrong page | **Done** | Diagnosed without live reproduction: FOUR buttons, four wrong destinations — `/${locale}/signIn` (wrong casing), `/en/form-step1` (locale hard-coded, Phase 1 form model), `/auth/signin` (no locale), `/about` (the page it is on). All now go through `lib/routes.js`. |
 
 **`npm run build` was broken on `main` and had been since v1.0.** The missing
 icon fonts above were hard webpack resolution errors, not warnings, so no
@@ -124,17 +124,17 @@ credentials.
 
 | Requirement | State | Work |
 |---|---|---|
-| Platform fee collection (Stripe) | **Absent** | Stripe Billing subscriptions. |
-| Revenue distribution (Stripe Connect) | **Absent** | Connect Express onboarding + transfers. |
-| KYC replacement | **Absent** | Adapter + Didit. |
+| Platform fee collection (Stripe) | **Parked** | Built, not switched on. |
+| Revenue distribution (Stripe Connect) | **Blocked** | The money-transmission question. Stripe Connect cannot reach the Caribbean; Global Payouts can but needs a US/UK platform entity. WiPay has no recurring primitive. Your call, once WiPay is set up. |
+| KYC replacement | **Done** | Provider-agnostic adapter; Didit live, Persona throws with an explanation rather than pretending. |
 | PDF stamping, core PDF uneditable, upload must be PDF | **Done** | PDF only, enforced server-side against Storage metadata. Rejected with the reason: a conversion step between what the client approved and what the notary seals is a gap nobody can audit. |
-| ZegoCloud video | **Partial** | Works; server secret must move server-side. |
+| ZegoCloud video | **Done, one thing unproven** | Secret is server-side in `lib/video/zego.js`; tokens are per-session and per-participant. The `token04` generator was transcribed from ZEGO's spec and has NEVER been tested against a live project — if a call fails on a token error, swap in `zego-server-assistant`. |
 | Workflow order: Personal Info → Doc Selection → Signature & Notarization → Payment → Download | **Done** | `components/client/RequestWizard.jsx`. Jurisdiction and service are chosen **before** the upload, so a refusal happens before the client has uploaded or paid anything. |
-| COaths as distinct role everywhere | **Absent** | Build. |
+| COaths as distinct role everywhere | **Done** | |
 | T&Cs checkbox at Document Selection | **Done** | Recorded to `/acceptances` with the text VERSION accepted, immutable. A tick box that gates a button and is then forgotten proves nothing. |
 | Disclaimer pop-up before upload, jurisdiction-specific | **Done** | Versioned constants in `lib/clientRequests.js`, not component text — text in a component changes silently on deploy and takes the meaning of every past acceptance with it. |
 | Document-to-role and document-to-jurisdiction mapping via admin templates | **Done** | `lib/templates.js` + `/admin/templates`. Unavailable types are shown to the client **with their reason** rather than filtered out — an empty list reads as a broken website. |
-| Document revocation (paid), multi-party KYC opt-in, auth code returns "Revoked" | **Absent** | `authenticate/` verification flow exists to extend. |
+| Document revocation (paid), multi-party KYC opt-in, auth code returns "Revoked" | **Absent** | Stage 7, the only brief requirement not started. Admin-side revocation is done; client-initiated paid revocation is not, and the `authenticate/` code lookup does not yet report "Revoked". |
 
 **Count: 7 partial-and-usable, 12 partial-needs-rework, 30 absent.**
 

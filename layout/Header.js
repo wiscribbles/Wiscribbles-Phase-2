@@ -4,6 +4,7 @@ import MobileMenu from "./MobileMenu";
 import { useTranslations } from "next-intl";
 import { useState, useEffect } from "react";
 import LangSwitcher from "@/components/LangSwitch";
+import { dashboard, notarizeNow } from "@/lib/routes";
 const Header = ({ header, locale, login }) => {
   switch (header) {
     case 1:
@@ -354,7 +355,11 @@ const DefaultHeader = ({ locale, login }) => {
             </div>
             {/* Menu Button */}
             <div className="menu-btns">
-              <Link legacyBehavior href="/auth/signin">
+              {/* Was `/auth/signin` with no locale segment. "Notarize Now"
+                  should start the request, not strand the visitor on a
+                  dashboard having forgotten what they came for — /request
+                  bounces them through sign-in and returns them. */}
+              <Link legacyBehavior href={login ? dashboard(locale) : notarizeNow(locale)}>
                 <a className="theme-btn style-three">
                   {login ? t("navbar.pill-login") : t("navbar.pill-button")}
                   <i className="fas fa-angle-double-right" />

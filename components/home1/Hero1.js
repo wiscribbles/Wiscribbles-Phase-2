@@ -1,4 +1,5 @@
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { notarizeNow } from "@/lib/routes";
 import Link from "next/link";
 import Slider from "react-slick";
 
@@ -15,6 +16,7 @@ const Hero1 = () => {
     slidesToShow: 1,
   };
   const t = useTranslations();
+  const locale = useLocale();
   return (
     <section
       id="home"
@@ -84,7 +86,10 @@ const Hero1 = () => {
                 </span>
               </h1>
               <div className="slider-btns">
-                <Link legacyBehavior href="/en/form-step1">
+                {/* Was `/en/form-step1` — locale hard-coded to English, and
+                    pointing at the Phase 1 form model that Stage 6 replaced
+                    with the upload-and-bind flow at /request. */}
+                <Link legacyBehavior href={notarizeNow(locale)}>
                   <a className="theme-btn" style={{ color: '#FFFFFF' }}>
                     {t("slider_btn_get_started")}
                     <i className="fas fa-angle-double-right" />

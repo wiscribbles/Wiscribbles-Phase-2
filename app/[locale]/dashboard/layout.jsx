@@ -1,52 +1,28 @@
-"use client";
-import { Container, Row, Col, Nav } from 'react-bootstrap';
-import { useTranslations } from 'next-intl';
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { auth } from "../../../firebase";
-import { onAuthStateChanged } from "firebase/auth";
+/**
+ * The dashboard layout.
+ *
+ * WHAT THIS USED TO BE, AND WHY IT HAD TO GO
+ *
+ * A client component that subscribed to `onAuthStateChanged` and, if there was
+ * no user, called `router.replace("/auth/signin")`. Three problems, and the
+ * third is the one that mattered:
+ *
+ *   1. It was a CLIENT-SIDE guard. It hid the UI; it did not deny access. The
+ *      data behind it was protected by `firestore.rules`, not by this.
+ *   2. The redirect dropped the locale — `/auth/signin` rather than
+ *      `/${locale}/auth/signin` — so a signed-out visitor landed outside the
+ *      i18n routing.
+ *   3. It applied to every route NESTED under /dashboard, which since Stage 4
+ *      includes the partner dashboard. So the Phase 2 pages, which do their own
+ *      server-side verification, were additionally gated behind a weaker
+ *      client-side check that could flash a spinner, then redirect a perfectly
+ *      valid session to a locale-less sign-in page.
+ *
+ * Now it is a plain wrapper. Each page under here guards itself on the server
+ * (`requireVerifiedUser`, `requirePartner`), which is the only kind of guard
+ * that denies rather than hides.
+ */
 
 export default function DashboardLayout({ children }) {
-  const t = useTranslations('dashboard');
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        // User is not authenticated, redirect to sign-in page
-        router.replace("/auth/signin");
-      } else {
-        // User is authenticated, allow access
-        setAuthenticated(true);
-        setLoading(false);
-      }
-    });
-
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, [router]);
-
-  // Show loading state while checking authentication
-  if (loading) {
-    return (
-      <Container fluid className="d-flex justify-content-center align-items-center" style={{ height: "100vh", width:"100%" }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </Container>
-    );
-  }
-
-  // Only render the dashboard when authenticated
-  return authenticated ? (
-    <Container fluid>
-      <Row>
-        <Col>
-          {children}
-        </Col>
-      </Row>
-    </Container>
-  ) : null;
+  return <>{children}</>;
 }
