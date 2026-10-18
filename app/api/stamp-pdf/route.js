@@ -2,7 +2,7 @@
 import { requireUser } from '@/lib/serverAuth';
 import { isTrustedDocumentUrl } from '@/lib/apiUtils';
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebase-admin';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -222,7 +222,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Submission ID is required' }, { status: 400 });
     }
 
-    const submissionRef = adminDb.collection('formSubmissions').doc(submissionId);
+    const submissionRef = adminDb().collection('formSubmissions').doc(submissionId);
     const submissionDoc = await submissionRef.get();
 
     if (!submissionDoc.exists) {

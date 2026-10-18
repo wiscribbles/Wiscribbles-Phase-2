@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireNotary } from '@/lib/serverAuth';
 import { isTrustedDocumentUrl } from '@/lib/apiUtils';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebase-admin';
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
@@ -653,7 +653,7 @@ export async function POST(request) {
       if (sessionId) {
         try {
           // All notary sessions are stored in formSubmissions collection
-          const submissionRef = adminDb.collection('formSubmissions').doc(sessionId);
+          const submissionRef = adminDb().collection('formSubmissions').doc(sessionId);
           const submissionDoc = await submissionRef.get();
           
           if (submissionDoc.exists) {

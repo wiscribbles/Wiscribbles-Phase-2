@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { escapeHtml, isTrustedDocumentUrl } from '@/lib/apiUtils';
 import { generateReferenceNumber } from '@/lib/referenceNumber';
 import { requireNotary } from '@/lib/serverAuth';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebase-admin';
 import { Resend } from 'resend';
 import { PDFDocument, rgb } from 'pdf-lib';
 
@@ -172,7 +172,7 @@ export async function POST(request) {
     const { submissionId, approved, notaryId, notaryName } = await request.json();
 
     // Get the submission document
-    const submissionRef = adminDb.collection('formSubmissions').doc(submissionId);
+    const submissionRef = adminDb().collection('formSubmissions').doc(submissionId);
     const submissionDoc = await submissionRef.get();
 
     if (!submissionDoc.exists) {

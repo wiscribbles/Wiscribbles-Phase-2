@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function POST(request) {
   try {
@@ -37,7 +37,7 @@ export async function POST(request) {
     });
 
     // Save to Firebase
-    const docRef = adminDb.collection('documentForms').doc(documentFormId);
+    const docRef = adminDb().collection('documentForms').doc(documentFormId);
     await docRef.set(documentFormData, { merge: true });
 
     return NextResponse.json({
@@ -96,7 +96,7 @@ export async function GET(request) {
     });
 
     // Get from Firebase
-    const docRef = adminDb.collection('documentForms').doc(documentFormId);
+    const docRef = adminDb().collection('documentForms').doc(documentFormId);
     const docSnap = await docRef.get();
 
     if (docSnap.exists) {

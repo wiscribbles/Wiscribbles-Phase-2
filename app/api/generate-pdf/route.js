@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebase-admin';
 
 // Helper function to fetch document form data from database
 const fetchDocumentFormData = async (documentType, userId, sessionId) => {
@@ -14,7 +14,7 @@ const fetchDocumentFormData = async (documentType, userId, sessionId) => {
     const documentFormId = `${identifier}_${documentType}`;
     console.log('Fetching document form data:', { documentFormId, documentType, userId: userId || 'anonymous' });
 
-    const docRef = adminDb.collection('documentForms').doc(documentFormId);
+    const docRef = adminDb().collection('documentForms').doc(documentFormId);
     const docSnap = await docRef.get();
 
     if (docSnap.exists) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 
 // Generate meeting ID for notary session
@@ -179,7 +179,7 @@ export async function POST(request) {
     console.log('Prepared notary submission data:', submissionData);
 
     // Submit to Firebase Firestore
-    const docRef = await adminDb.collection('formSubmissions').add(submissionData);
+    const docRef = await adminDb().collection('formSubmissions').add(submissionData);
     
     // Prepare response data
     const responseData = {
@@ -234,7 +234,7 @@ export async function GET(request) {
 
     // Query Firestore for the session
     
-    const querySnapshot = await adminDb.collection('formSubmissions')
+    const querySnapshot = await adminDb().collection('formSubmissions')
       .where('meetingId', '==', meetingId)
       .where('type', '==', 'notary')
       .limit(1)
