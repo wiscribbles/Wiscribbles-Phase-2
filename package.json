@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "check-setup": "node scripts/check-setup.mjs",
-    "grant-admin": "node scripts/grant-admin.mjs"
+    "grant-admin": "node scripts/grant-admin.mjs",
+    "deploy-rules": "firebase deploy --only firestore:rules,storage"
   },
   "dependencies": {
     "@emailjs/browser": "^3.11.0",
