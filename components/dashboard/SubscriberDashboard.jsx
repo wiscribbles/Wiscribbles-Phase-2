@@ -69,7 +69,7 @@ export default function SubscriberDashboard({
         if (active === TABS.SOCIAL_MEDIA) return <SocialMediaTab locale={locale} />;
         if (active === TABS.ANALYTICS) return <AnalyticsTab />;
         if (active === TABS.SUPPORT) return <SupportTab />;
-        if (active === TABS.FILE_MANAGER) return <FileManagerTab />;
+        if (active === TABS.FILE_MANAGER) return <FileManagerTab locale={locale} />;
 
         if (active === TABS.INVOICE) {
           return (

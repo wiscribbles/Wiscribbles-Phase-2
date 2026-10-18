@@ -255,6 +255,33 @@ service cloud.firestore {
     }
 
     /* --------------------------------------------------------------------- */
+    /* revocationRequests                                                     */
+    /* A party asking for an executed document to be withdrawn. Readable by    */
+    /* EVERY party to the document, not just the requester: the other parties   */
+    /* are entitled to see a request that would destroy something they may be   */
+    /* relying on, and to say why it should not happen. The decision is the     */
+    /* Website Manager's and goes through a server route.                       */
+    /* --------------------------------------------------------------------- */
+
+    match /revocationRequests/{requestId} {
+      allow get: if isAdmin()
+                 || (signedIn() && uid() in resource.data.get('partyIds', []));
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* authenticationAttempts                                                 */
+    /* Rate-limit counters for the public verification endpoint, keyed on a    */
+    /* hash of the caller. Nothing may read these from a browser: the counts    */
+    /* would tell an attacker exactly how much budget they have left.           */
+    /* --------------------------------------------------------------------- */
+
+    match /authenticationAttempts/{key} {
+      allow read, write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
     /* prepareRegisterRequests                                                */
     /* The wet-ink route for documents the statute excludes from electronic   */
     /* execution. Server-written: the eligibility check (is this category     */

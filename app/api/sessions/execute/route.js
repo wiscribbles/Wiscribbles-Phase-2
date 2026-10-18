@@ -37,6 +37,7 @@ import {
   isConductingProfessional,
 } from '@/lib/sessions';
 import { StampError, applySeal } from '@/lib/stamp';
+import { assignReferenceNumber } from '@/lib/authentication';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -151,13 +152,23 @@ export async function POST(request) {
 
       const executedAt = new Date().toISOString();
 
+      /* The reference number comes FIRST, because it has to be printed on the
+         certificate page. Assigning it after sealing would produce a document
+         whose certificate carries no reference — unverifiable by the only
+         route a third party has. Idempotent, so a retry after a failed seal
+         keeps the reference somebody may already be holding. */
+      const referenceNumber = await assignReferenceNumber({
+        documentId: session.documentId,
+        jurisdiction: session.jurisdiction,
+      });
+
       /* The seal. Reads the source PDF from Storage by path — the path on the
          document record, not one supplied in the request. */
       const sealed = await applySeal({
         storagePath: record.storagePath,
         professional,
         session,
-        document: record,
+        document: { ...record, referenceNumber },
         executedAt,
       });
 
@@ -170,6 +181,7 @@ export async function POST(request) {
         documentRef,
         {
           status: 'notarised',
+          referenceNumber,
           stampedPath: sealed.path,
           pageCount: sealed.pageCount,
           executedAt,
@@ -228,7 +240,12 @@ export async function POST(request) {
         })
         .catch((error) => console.error('[sessions/execute] AUDIT WRITE FAILED', error));
 
-      return NextResponse.json({ ok: true, executedAt, pageCount: sealed.pageCount });
+      return NextResponse.json({
+        ok: true,
+        executedAt,
+        pageCount: sealed.pageCount,
+        referenceNumber,
+      });
     } catch (error) {
       if (error instanceof SessionError) {
         return NextResponse.json(

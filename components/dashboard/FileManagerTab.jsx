@@ -32,7 +32,7 @@ const formatBytes = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export default function FileManagerTab() {
+export default function FileManagerTab({ locale = 'en' }) {
   const [data, setData] = useState(null);
   const [filters, setFilters] = useState({ status: '', jurisdiction: '', q: '', archived: 'false' });
   const [busy, setBusy] = useState(null);
@@ -227,6 +227,18 @@ export default function FileManagerTab() {
             >
               {document.archived ? 'Restore' : 'Archive'}
             </button>
+
+            {/* Only on an executed document: there is nothing to withdraw from
+                a draft, and offering it there would invite it to be used as a
+                delete button. */}
+            {['signed', 'notarised'].includes(document.status) && (
+              <a
+                className="btn btn-sm btn-link text-muted"
+                href={`/${locale}/revoke?documentId=${encodeURIComponent(document.id)}`}
+              >
+                Request revocation
+              </a>
+            )}
           </div>
         </article>
       ))}
