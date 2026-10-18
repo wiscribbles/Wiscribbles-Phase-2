@@ -181,6 +181,7 @@ export async function POST(request) {
         witnesses: Number(body?.witnesses ?? 0),
         seals: Number(body?.seals ?? 1),
         parties: Array.isArray(body?.parties) ? body.parties : [],
+        signingWindowDays: body?.signingWindowDays,
         acceptances: {
           termsVersion: String(body?.acceptances?.termsVersion ?? ''),
           disclaimerVersion: String(body?.acceptances?.disclaimerVersion ?? ''),

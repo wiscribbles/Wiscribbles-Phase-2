@@ -16,8 +16,9 @@ export const dynamic = 'force-dynamic';
  * is specific to a client account. What it does require is a verified email,
  * because the request creates a document and joins a queue of real people.
  */
-export default async function RequestPage({ params }) {
+export default async function RequestPage({ params, searchParams }) {
   const { locale } = await params;
+  const { path, template } = (await searchParams) ?? {};
   await requireVerifiedUser(locale, { returnTo: `/${locale}/request` });
 
   return (
@@ -30,7 +31,15 @@ export default async function RequestPage({ params }) {
         </p>
       </header>
 
-      <RequestWizard locale={locale} />
+      {/* Arriving from the standard forms library: the copy is already in
+          their repository, so the upload step is already satisfied. */}
+      <RequestWizard
+        locale={locale}
+        prefill={{
+          storagePath: typeof path === 'string' ? path : null,
+          templateId: typeof template === 'string' ? template : null,
+        }}
+      />
     </main>
   );
 }

@@ -31,6 +31,7 @@ import { authErrorResponse, requireApiUser } from '@/lib/auth/server';
 import { getSignedUrl } from '@/lib/storage/server';
 import { DOCUMENT_CATEGORIES } from '@/lib/templates';
 import { listLaunchJurisdictions } from '@/lib/jurisdictions';
+import { describeUsage, usageFor } from '@/lib/quota';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -154,8 +155,13 @@ export async function GET(request) {
       ? documents.filter((document) => document.name.toLowerCase().includes(search))
       : documents;
 
+    /* Their repository usage, served with the listing. Finding out you are
+       full at the moment an upload is refused is worse than knowing. */
+    const usage = await usageFor({ uid: user.uid, planId: user.planId ?? null });
+
     return NextResponse.json({
       documents: filtered,
+      usage: describeUsage(usage),
       truncated: snapshot.size >= PAGE_SIZE * 2,
       options: {
         statuses: DOCUMENT_STATUS_OPTIONS,

@@ -255,6 +255,18 @@ service cloud.firestore {
     }
 
     /* --------------------------------------------------------------------- */
+    /* standardForms                                                          */
+    /* The shared library. Readable by any verified account — that is the      */
+    /* point of it — and written only by the Website Manager through a server  */
+    /* route, which checks the PDF type, the size and the template binding.    */
+    /* --------------------------------------------------------------------- */
+
+    match /standardForms/{formId} {
+      allow get, list: if emailVerified();
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
     /* revocationRequests                                                     */
     /* A party asking for an executed document to be withdrawn. Readable by    */
     /* EVERY party to the document, not just the requester: the other parties   */

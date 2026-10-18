@@ -16,6 +16,83 @@ import { adminDb } from '@/lib/firebase-admin';
 import { authErrorResponse, requireApiAdmin } from '@/lib/auth/server';
 import { RepositoryError, revokeDocument } from '@/lib/admin/documents';
 import { RR_STATUS, RR_STATUS_LABELS, listForAdmin } from '@/lib/revocationRequests';
+import { getBaseUrl } from '@/lib/apiUtils';
+import {
+  revocationGrantedEmail,
+  revocationRefusedEmail,
+  sendEmail,
+} from '@/lib/email/send';
+
+/**
+ * Email the outcome.
+ *
+ * A grant goes to EVERY party — somebody may be acting on the document right
+ * now and needs to stop. A refusal goes only to the person who asked: the
+ * other parties were told a request existed, and telling them it failed adds
+ * nothing while reopening a matter they may consider closed.
+ *
+ * Best-effort. A mail failure must never leave a document revoked in the
+ * database but not revoked as far as the code is concerned, so this runs after
+ * the decision is written and only logs.
+ */
+async function notifyOutcome({ decision, requestRecord, note }) {
+  const link = `${getBaseUrl()}/en/authenticate`;
+  const documentName = requestRecord.documentName ?? 'a document';
+
+  const addressFor = async (uid) => {
+    try {
+      const snapshot = await adminDb().collection('users').doc(uid).get();
+      if (!snapshot.exists) return null;
+      const data = snapshot.data();
+      return data.email ? { email: data.email, name: data.name ?? 'there' } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  if (decision === 'refuse') {
+    const recipient =
+      requestRecord.requestedByEmail
+        ? { email: requestRecord.requestedByEmail, name: 'there' }
+        : await addressFor(requestRecord.requestedByUid);
+
+    if (recipient) {
+      await sendEmail({
+        to: recipient.email,
+        ...revocationRefusedEmail({
+          name: recipient.name,
+          documentName,
+          reason: note,
+          link: `${getBaseUrl()}/en/dashboard`,
+        }),
+      }).catch((error) => console.error('[admin/revocations] refusal email failed', error));
+    }
+    return;
+  }
+
+  const parties = Array.isArray(requestRecord.partyIds) ? requestRecord.partyIds : [];
+  const recipients = (await Promise.all(parties.map(addressFor))).filter(Boolean);
+
+  await Promise.all(
+    recipients.map((recipient) =>
+      sendEmail({
+        to: recipient.email,
+        ...revocationGrantedEmail({
+          name: recipient.name,
+          documentName,
+          reference: requestRecord.documentReference ?? null,
+          reason: note,
+          link,
+        }),
+      }).catch((error) =>
+        console.error('[admin/revocations] COULD NOT TELL A PARTY A DOCUMENT WAS REVOKED', {
+          documentId: requestRecord.documentId,
+          error,
+        }),
+      ),
+    ),
+  );
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -125,6 +202,8 @@ export async function POST(request) {
         })
         .catch(() => {});
 
+      await notifyOutcome({ decision: 'refuse', requestRecord, note });
+
       return NextResponse.json({ ok: true, status: RR_STATUS.REFUSED });
     }
 
@@ -161,6 +240,8 @@ export async function POST(request) {
       },
       { merge: true },
     );
+
+    await notifyOutcome({ decision: 'grant', requestRecord, note });
 
     return NextResponse.json({ ok: true, status: RR_STATUS.GRANTED });
   } catch (error) {

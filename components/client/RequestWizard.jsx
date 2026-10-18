@@ -26,7 +26,7 @@ import { MAX_UPLOAD_MB, UPLOAD_PURPOSE, UploadError, uploadFile } from '@/lib/st
 
 const STEPS = ['terms', 'disclaimer', 'service', 'document', 'payment'];
 
-export default function RequestWizard({ locale }) {
+export default function RequestWizard({ locale, prefill = null }) {
   const router = useRouter();
 
   const [options, setOptions] = useState(null);
@@ -53,11 +53,25 @@ export default function RequestWizard({ locale }) {
    * else". */
   const [otherParties, setOtherParties] = useState([]);
   const [seals, setSeals] = useState(1);
+  const [signingWindowDays, setSigningWindowDays] = useState(14);
   const [feeQuote, setFeeQuote] = useState(null);
 
   const signatoryCount =
     1 + otherParties.filter((p) => p.role !== 'witness' && p.email.trim()).length;
   const witnessCount = otherParties.filter((p) => p.role === 'witness' && p.email.trim()).length;
+
+  /* A form taken from the standard library arrives already copied into the
+     client's repository, so the upload step is done before they get here. The
+     file is adopted rather than re-uploaded: asking someone to upload the
+     document the platform just handed them would be absurd, and would put a
+     second copy against their quota. */
+  useEffect(() => {
+    if (!prefill?.storagePath) return;
+    setUpload({ path: prefill.storagePath, bytes: 0, name: 'Standard form' });
+    if (prefill.templateId) {
+      setChoice((current) => ({ ...current, templateId: prefill.templateId }));
+    }
+  }, [prefill?.storagePath, prefill?.templateId]);
 
   useEffect(() => {
     (async () => {
@@ -188,6 +202,7 @@ export default function RequestWizard({ locale }) {
           signatories: signatoryCount,
           witnesses: witnessCount,
           seals,
+          signingWindowDays,
           parties: otherParties
             .filter((p) => p.email.trim())
             .map((p) => ({ name: p.name, email: p.email, role: p.role })),
@@ -530,16 +545,29 @@ export default function RequestWizard({ locale }) {
             executed document is not the file you uploaded.
           </p>
 
-          <div className="mb-3">
-            <input
-              type="file"
-              className="form-control"
-              accept="application/pdf"
-              onChange={pickFile}
-              disabled={busy}
-              style={{ maxWidth: 420 }}
-            />
-          </div>
+          {prefill?.storagePath ? (
+            <div
+              className="p-3 mb-3"
+              style={{ ...STYLES.card, borderLeft: `4px solid ${COLORS.success}` }}
+            >
+              <strong style={{ fontSize: '0.9rem' }}>Standard form ready</strong>
+              <p className="mb-0 mt-1" style={{ fontSize: '0.84rem', color: COLORS.inkMuted }}>
+                You chose this from the forms library, so there is nothing to
+                upload. Give it a name below and carry on.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-3">
+              <input
+                type="file"
+                className="form-control"
+                accept="application/pdf"
+                onChange={pickFile}
+                disabled={busy}
+                style={{ maxWidth: 420 }}
+              />
+            </div>
+          )}
 
           {upload && (
             <div
@@ -692,6 +720,33 @@ export default function RequestWizard({ locale }) {
                 </p>
               </div>
             )}
+
+            {/* ---- the signing window ---- */}
+            <div className="mt-4" style={{ maxWidth: 420 }}>
+              <label className="form-label" htmlFor="req-window" style={{ fontWeight: 500 }}>
+                How long do the parties have to sign?
+              </label>
+              <select
+                id="req-window"
+                className="form-select"
+                value={signingWindowDays}
+                onChange={(e) => setSigningWindowDays(Number(e.target.value))}
+              >
+                {(options.signingWindows ?? []).map((window) => (
+                  <option key={window.days} value={window.days}>
+                    {window.label}
+                    {window.recommended ? ' — recommended' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="mb-0 mt-1" style={{ fontSize: '0.8rem', color: COLORS.inkMuted, lineHeight: 1.6 }}>
+                If it is not signed in that time the file is removed to free
+                storage, and you would need to upload it again. You can extend
+                the window at any point before it closes. A document that HAS
+                been signed or notarised is kept permanently — this only ever
+                applies to one nobody completed.
+              </p>
+            </div>
 
             {feeQuote && (
               <p className="mb-0 mt-3" style={{ fontSize: '0.86rem', color: COLORS.inkSubtle }}>

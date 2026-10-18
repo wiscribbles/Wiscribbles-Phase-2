@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { COLORS, STYLES, pill } from '@/lib/theme';
+import { COLORS, RADIUS, STYLES, pill } from '@/lib/theme';
 
 const STATUS_TONE = {
   draft: 'neutral',
@@ -103,6 +103,54 @@ export default function FileManagerTab({ locale = 'en' }) {
       <h2 style={STYLES.sectionHeading}>
         {showingArchive ? 'Archived documents' : 'Your documents'}
       </h2>
+
+      {/* ---- the repository quota ---- */}
+      {data.usage && (
+        <div className="p-3 mt-2 mb-3" style={STYLES.card}>
+          <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <p className="mb-1" style={{ fontSize: '0.86rem', color: COLORS.inkSubtle }}>
+                {data.usage.used} of {data.usage.quota} used
+                {data.usage.documentCount
+                  ? ` · ${data.usage.documentCount} document${data.usage.documentCount === 1 ? '' : 's'}`
+                  : ''}
+              </p>
+              <div
+                style={{
+                  height: 6,
+                  borderRadius: RADIUS.pill,
+                  background: COLORS.border,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${data.usage.percentUsed}%`,
+                    height: '100%',
+                    background:
+                      data.usage.tone === 'danger'
+                        ? COLORS.danger
+                        : data.usage.tone === 'warning'
+                          ? COLORS.warning
+                          : COLORS.success,
+                  }}
+                />
+              </div>
+            </div>
+            <span style={pill(data.usage.tone === 'ok' ? 'success' : data.usage.tone)}>
+              {data.usage.percentUsed}%
+            </span>
+          </div>
+
+          {data.usage.message && (
+            <p className="mb-0 mt-2" style={{ fontSize: '0.84rem', color: COLORS.warningText }}>
+              {data.usage.message} An executed document is never deleted to make
+              room — archive what you no longer need, let unsigned documents
+              lapse, or move to a larger plan.
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="alert alert-warning py-2" role="status">

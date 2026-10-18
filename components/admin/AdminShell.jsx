@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LayoutDashboard, Users, FileText, CreditCard, ShieldCheck, Settings, LogOut, UserCheck, FileCheck, Archive, PenLine, Ban } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Users, FileText, CreditCard, ShieldCheck, Settings, LogOut, UserCheck, FileCheck, Archive, PenLine, Ban, Library } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/firebase';
 import { signOut } from 'firebase/auth';
@@ -38,6 +38,12 @@ const navigationItems = [
     slug: '/templates',
     icon: FileCheck,
     description: 'Role and jurisdiction mapping for every document type',
+  },
+  {
+    label: 'Standard Forms',
+    slug: '/forms',
+    icon: Library,
+    description: 'Blank forms every account can use',
   },
   {
     label: 'Document Repository',

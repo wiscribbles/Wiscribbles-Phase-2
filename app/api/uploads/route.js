@@ -17,6 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import { authErrorResponse, requireApiUser } from '@/lib/auth/server';
+import { QuotaError, assertRoomFor } from '@/lib/quota';
 import {
   ALLOWED_DOCUMENT_TYPES,
   ALLOWED_IMAGE_TYPES,
@@ -147,6 +148,33 @@ export async function POST(request) {
     // header and the body is what actually lands in the bucket.
     if (buffer.byteLength > MAX_UPLOAD_BYTES) {
       return NextResponse.json({ error: 'file_too_large' }, { status: 413 });
+    }
+
+    /* The repository quota.
+     *
+     * Checked against the REAL byte length, after the body has landed but
+     * before anything is written to the bucket — a client-supplied size header
+     * would be the obvious thing to lie about, and refusing after the write
+     * would mean the bytes were already stored.
+     *
+     * Professionals are exempt: the documents they handle belong to the
+     * clients who uploaded them and count against those accounts. Quota-ing a
+     * notary would charge them for other people's files. See lib/quota.js. */
+    try {
+      await assertRoomFor({
+        uid: user.uid,
+        planId: user.planId ?? null,
+        role: user.role,
+        bytes: buffer.byteLength,
+      });
+    } catch (error) {
+      if (error instanceof QuotaError) {
+        return NextResponse.json(
+          { error: error.code, message: error.message },
+          { status: error.status },
+        );
+      }
+      throw error;
     }
 
     const filename = uniqueFilename(file.name, 'upload');
