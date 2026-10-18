@@ -1,9 +1,19 @@
 # WiScribbles Phase 2 — Gap Analysis & Build Plan
 
 Source: *WiScribble Platform Project Brief: Phase 2 Enhancements* (TG Edit)
-Baseline: `wiscribbles/WiScribble` @ `dbde6d0` ("v1.0")
-Working branch: `phase2` (original `main` untouched)
+Baseline: `wiscribbles/WiScribble` @ `c126d44` (branch `fix/security-and-deploy-hardening`,
+which was never merged to `main` — see note below)
+Repository: `wiscribbles/Wiscribbles-Phase-2`, branch `main`
 Date: 18 October 2026
+
+> **Baseline note.** This plan was first written against `main` @ `dbde6d0`. An
+> unmerged branch, `fix/security-and-deploy-hardening` (5 Oct 2026), was found
+> afterwards and Phase 2 was rebased onto it. It had already removed the
+> committed Admin key, moved API routes to the Admin SDK, moved the ZegoCloud
+> secret server-side at `/api/zego-token`, fixed an SSRF host check and a
+> filename header injection, moved Stripe pricing server-side, and deleted the
+> debug/test routes. Several "absent" rows below were satisfied by it. **It is
+> still unmerged on `WiScribble`, so none of those fixes are in production.**
 
 ---
 
@@ -101,8 +111,14 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 | Requirement | State | Work |
 |---|---|---|
 | Logo visibility fix | **Needs live reproduction** | `Logo.jsx` injects a `<style>` element into `document.head` on every mount and removes it on unmount — with two logos mounted, the first unmount strips the shared styles. Likely cause; needs confirming against the live site. |
-| Heading images rendering as square boxes | **Needs live reproduction** | Almost certainly missing asset paths under `public/assets/images/`. Will enumerate against the live site. |
+| Heading images rendering as square boxes | **Root cause found and fixed** | Not missing images — missing **icon webfonts**. The headings use `<i className="flaticon-*">` and FontAwesome glyphs; when the webfont fails to load the browser renders the tofu box. `public/assets/v1/fonts` and `v2/fonts` were each missing five FontAwesome files including `fa-solid-900.{eot,ttf,svg}`, and `_bootstrap-icons.scss` pointed `$bootstrap-icons-font-dir` at `"../../fonts"` while every sibling partial uses `"../fonts"`, resolving outside `public/assets` entirely. Both fixed. Verify against the live site. |
 | "Notarize Now" button routes to wrong page | **Partial** | Label lives in `locales/en.json` (3 places); the `href` is hard-coded at each call site. Needs a single route constant. |
+
+**`npm run build` was broken on `main` and had been since v1.0.** The missing
+icon fonts above were hard webpack resolution errors, not warnings, so no
+production build could complete. Fixed in the same change. The build now reaches
+"Compiled successfully" and stops only at prerender for want of Firebase
+credentials.
 
 ### 4. Plugin / workflow
 
