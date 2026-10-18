@@ -84,21 +84,21 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 | Certificate upload, 25MB cap | **Done** | Cloudinary removed entirely. `/api/uploads` authenticates the caller, enforces the 25MB cap and the permitted content types, and derives the storage path from the session rather than from the request. `storage.rules` enforces the same limits on any direct client write. |
 | Bank capture + tokenization (Financials) | **Absent** | Stripe Connect onboarding. |
 | Status tracker + `admin_feedback` + resubmission | **Absent** | Build. |
-| Notary post-approval: Account / Analytics / Support / Financials | **Absent** | Build all four. |
-| Go Live / Offline toggle → realtime status | **Absent** | Supabase client is wired; `RealtimeSync.js` exists as a starting point. |
-| Jurisdiction-based waiting queue, realtime | **Absent** | Build. |
-| Accept Client / Decline Request | **Absent** | Build. |
+| Notary post-approval: Account / Analytics / Support / Financials | **Done** | All four built. Financials is a `ParkedTab` pending the transmission decision. |
+| Go Live / Offline toggle → realtime status | **Done** | `lib/availability.js` + `/api/partner/availability`. Server-written only, with a 2-minute presence TTL and a 1-minute heartbeat, so a closed laptop stops receiving work. |
+| Jurisdiction-based waiting queue, realtime | **Done** | `lib/queue.js` + `/api/partner/queue`, polled at 5s. Polled rather than `onSnapshot` so client identities can be redacted server-side until acceptance. |
+| Accept Client / Decline Request | **Done** | `/api/partner/queue/claim`, both as Firestore transactions so two notaries cannot claim one client. Audited. |
 | Session: Zego SDK + PDF viewer embedded | **Partial** | `SafeVideoCall.jsx`, `ContainedVideoCall.jsx`, `PDFViewer.jsx` exist separately; never composed into one session view. |
-| **Jurisdiction lockout — session must not proceed on mismatch** | **Absent** | Build. Hard block, enforced server-side, not just UI. |
-| Earnings / payouts view | **Absent** | Build. |
+| **Jurisdiction lockout — session must not proceed on mismatch** | **Partial** | Enforced server-side inside the accept transaction, and refusals are audited. The in-session display check lands with the session view (Stage 6). |
+| Earnings / payouts view | **Parked** | Deliberately not built against a guess at the provider. The Financials tab says what it is waiting for. |
 | Virtual stamp (e-seal) module | **Partial** | `api/notary-stamp-pdf`, `api/stamp-pdf` exist. No stamp creation, no seal asset, no authority binding. |
 | COaths — identical to Notary | **Absent** | Role does not exist. |
-| Attorney 7 tabs (Account, Appointment, Social Media, Analytics, Support, Invoice, File Manager) | **Absent** | Build all seven. |
+| Attorney 7 tabs (Account, Appointment, Social Media, Analytics, Support, Invoice, File Manager) | **Done** | Six working; Invoice is a `ParkedTab`. |
 | Attorney pre-approval: Account + Invoice only | **Absent** | Build. |
 | Attorney subscription via card (Invoice tab) | **Absent** | Stripe Billing. |
-| Appointment scheduling, max 24h window, e-sign vs notarise vs COath | **Partial** | `dashboard/calender`, `appointment/` are theme stubs. |
-| Social media signing-link generation | **Absent** | Build. |
-| File Manager repository | **Absent** | Build. |
+| Appointment scheduling, max 24h window, e-sign vs notarise vs COath | **Done** | `lib/appointments.js`. "Max 24h" read as a booking horizon — see the note in that file. Refuses notarisation in e-signature-only jurisdictions. |
+| Social media signing-link generation | **Done** | `lib/signingLinks.js`. Only a SHA-256 digest is stored, so a link is shown once and cannot be recovered — reissued instead. Every link expires; all are revocable. |
+| File Manager repository | **Done** | `/api/files`. Downloads are 10-minute signed URLs and are audited; nothing is deleted, only archived. |
 | Business role — as Attorney, registration doc instead of law certificate, no jurisdiction limit | **Absent** | Build on Attorney shell. |
 | Website Manager: accept / reject / request more info | **Partial** | `admin/commissioners`, `admin/users`, `AdminService.js` have the shape; the three-way action and feedback loop are not implemented. |
 | Document repository with Jurisdiction / Partner Type / Account Name filters | **Absent** | Build. |

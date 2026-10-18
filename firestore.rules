@@ -149,21 +149,59 @@ service cloud.firestore {
 
     /* --------------------------------------------------------------------- */
     /* notaryAvailability                                                     */
-    /* The Go Live / Offline toggle. A professional owns exactly their own     */
-    /* row, and may only claim jurisdictions once approved.                    */
+    /* The Go Live / Offline toggle.                                           */
+    /*                                                                         */
+    /* SERVER-WRITTEN ONLY — and this is a correction, not a precaution.       */
+    /* An earlier draft of these rules let a professional write their own row, */
+    /* restricted to the three fields below. That was wrong. The row carries   */
+    /* `jurisdictions`, and the queue match is BY jurisdiction, so a           */
+    /* professional who could write their own row could list a jurisdiction    */
+    /* they are not licensed in and be offered work there. The route at        */
+    /* /api/partner/availability copies the jurisdictions from the approved    */
+    /* profile and never takes them from the request body.                     */
     /* --------------------------------------------------------------------- */
 
     match /notaryAvailability/{professionalId} {
       // Clients need to see who is online to understand queue depth.
       allow get, list: if emailVerified();
 
-      allow create, update: if isOwner(professionalId)
-                            && isWorkingPartner()
-                            && request.resource.data.keys().hasOnly(
-                                 ['isOnline', 'jurisdictions', 'updatedAt']
-                               );
+      allow write: if false;
+    }
 
-      allow delete: if isOwner(professionalId) || isAdmin();
+    /* --------------------------------------------------------------------- */
+    /* appointments                                                           */
+    /* Booked by Attorneys and Businesses, within the 24-hour horizon that    */
+    /* lib/appointments.js enforces server-side.                               */
+    /* --------------------------------------------------------------------- */
+
+    match /appointments/{appointmentId} {
+      allow get: if isAdmin()
+                 || (signedIn() && (
+                      resource.data.createdBy == uid()
+                      || uid() in resource.data.get('participantIds', [])
+                    ));
+      allow list: if isAdmin()
+                  || (signedIn() && resource.data.createdBy == uid());
+
+      // The booking horizon, the jurisdiction check and the notarisation
+      // check all live in the route handler. A rule cannot express them.
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* signingLinks                                                           */
+    /* Bearer credentials for shareable signing. Only a SHA-256 digest of     */
+    /* the token is stored — see lib/signingLinks.js — but even the digest     */
+    /* is never served to a client, and the documents are never listable by   */
+    /* anyone but their creator.                                               */
+    /* --------------------------------------------------------------------- */
+
+    match /signingLinks/{linkId} {
+      // Deliberately not readable by the client at all, not even its own
+      // creator's: the listing comes from /api/signing-links, which strips the
+      // digest. A rule allowing the owner to read would hand them the digest.
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     /* --------------------------------------------------------------------- */
