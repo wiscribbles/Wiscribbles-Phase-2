@@ -54,6 +54,7 @@
     "react-visibility-sensor": "^5.1.1",
     "resend": "^4.7.0",
     "scribe.js-ocr": "^0.8.0",
+    "server-only": "^0.0.1",
     "simplebar-react": "^3.3.0",
     "stripe": "^18.2.1",
     "uuid": "^11.1.0",

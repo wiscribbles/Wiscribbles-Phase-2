@@ -1,0 +1,271 @@
+rules_version = '2';
+
+/**
+ * WiScribbles Firestore security rules — Phase 2.
+ *
+ * This is the layer that actually counts. The Next middleware can be bypassed
+ * by calling Firestore directly from the browser; these rules cannot. Anything
+ * that matters is denied here first and permitted narrowly.
+ *
+ * Reads of role and status come from the AUTH TOKEN (custom claims), never from
+ * the user's own document, because a document field is something the client
+ * might be able to write. Claims are set only by the Admin SDK, server-side,
+ * in `lib/auth/claims.js`.
+ *
+ * The Admin SDK bypasses these rules entirely — that is intended. Every
+ * privileged write (approval, suspension, payout, revocation) goes through a
+ * server route, which is also where it gets logged.
+ *
+ * Deploy:  firebase deploy --only firestore:rules
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* --------------------------------------------------------------------- */
+    /* Helpers                                                                */
+    /* --------------------------------------------------------------------- */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function emailVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.get('role', 'client') : 'client';
+    }
+
+    function status() {
+      return signedIn() ? request.auth.token.get('status', 'email_unverified') : 'email_unverified';
+    }
+
+    function isAdmin() {
+      return role() == 'admin';
+    }
+
+    /** Approved partner — the gate for anything operational. */
+    function isApprovedPartner() {
+      return emailVerified()
+        && status() == 'approved'
+        && role() in ['notary', 'coath', 'attorney', 'business'];
+    }
+
+    function isWorkingPartner() {
+      return isApprovedPartner() && role() in ['notary', 'coath'];
+    }
+
+    /** True when the write touches none of the listed fields. */
+    function doesNotTouch(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isOwner(ownerId) {
+      return signedIn() && uid() == ownerId;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* users                                                                  */
+    /* --------------------------------------------------------------------- */
+
+    match /users/{userId} {
+
+      /*
+       * Fields the user may NEVER write to their own document. Role and status
+       * are the obvious ones — writing them would be instant privilege
+       * escalation. The review and sanction trail is admin-owned evidence, and
+       * the Stripe identifiers are set from verified webhooks, never asserted
+       * by the browser.
+       */
+      function protectedFields() {
+        return [
+          'role', 'status', 'requiresApproval',
+          'adminFeedback', 'reviewedBy', 'reviewedAt', 'submittedForReviewAt',
+          'suspendedUntil', 'sanctionHistory',
+          'emailVerifiedAt', 'claimsUpdatedAt', 'lastSignInAt',
+          'kycStatus', 'kycProvider', 'kycReference', 'kycVerifiedAt',
+          'stripeAccountId', 'stripeCustomerId', 'stripeSubscriptionId',
+          'payoutsEnabled', 'availableBalance', 'lifetimeEarnings',
+          'certificateVerified',
+          'uid', 'email', 'createdAt'
+        ];
+      }
+
+      allow get: if isOwner(userId) || isAdmin();
+      // No open listing of the user base. Admin listing goes through a server
+      // route so it can be filtered, paginated and logged.
+      allow list: if isAdmin();
+
+      // Created server-side at sign-up only.
+      allow create: if false;
+
+      allow update: if isOwner(userId)
+                    && emailVerified()
+                    && doesNotTouch(protectedFields());
+
+      allow delete: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* documentTemplates                                                      */
+    /* Admin-authored. Carry the role + jurisdiction tick boxes that every     */
+    /* uploaded document must bind to (brief: Document-to-Role Mapping).       */
+    /* --------------------------------------------------------------------- */
+
+    match /documentTemplates/{templateId} {
+      // Everyone signed in needs to read these to pick a document type.
+      allow get, list: if emailVerified();
+      allow create, update, delete: if false;  // server route only
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* documents                                                              */
+    /* --------------------------------------------------------------------- */
+
+    match /documents/{documentId} {
+
+      function isParty() {
+        return signedIn() && (
+          resource.data.ownerId == uid()
+          || uid() in resource.data.get('signerIds', [])
+          || resource.data.get('assignedProfessionalId', null) == uid()
+        );
+      }
+
+      allow get: if isParty() || isAdmin();
+      allow list: if isAdmin();
+
+      // Documents are created and mutated through server routes: they carry
+      // template binding, jurisdiction checks, payment state and an audit
+      // trail, none of which can be trusted to the client.
+      allow create, update, delete: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* notaryAvailability                                                     */
+    /* The Go Live / Offline toggle. A professional owns exactly their own     */
+    /* row, and may only claim jurisdictions once approved.                    */
+    /* --------------------------------------------------------------------- */
+
+    match /notaryAvailability/{professionalId} {
+      // Clients need to see who is online to understand queue depth.
+      allow get, list: if emailVerified();
+
+      allow create, update: if isOwner(professionalId)
+                            && isWorkingPartner()
+                            && request.resource.data.keys().hasOnly(
+                                 ['isOnline', 'jurisdictions', 'updatedAt']
+                               );
+
+      allow delete: if isOwner(professionalId) || isAdmin();
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* serviceQueue                                                           */
+    /* Clients waiting for a notary or COath. Accept/Decline are server        */
+    /* routes, because they run the jurisdiction lockout.                      */
+    /* --------------------------------------------------------------------- */
+
+    match /serviceQueue/{entryId} {
+      allow get: if isParty() || isWorkingPartner() || isAdmin();
+
+      function isParty() {
+        return signedIn() && resource.data.get('clientId', null) == uid();
+      }
+
+      // A professional needs to see the queue for the jurisdictions they hold.
+      allow list: if isWorkingPartner() || isAdmin();
+
+      allow create, update, delete: if false;  // server routes only
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* sessions, payouts, auditLog, revocations                               */
+    /* Server-written throughout. The audit log in particular must be          */
+    /* append-only from the server, or it is not evidence of anything.         */
+    /* --------------------------------------------------------------------- */
+
+    match /sessions/{sessionId} {
+      allow get: if isAdmin()
+                 || (signedIn() && uid() in resource.data.get('participantIds', []));
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /payouts/{payoutId} {
+      allow get, list: if isAdmin()
+                       || (isWorkingPartner() && resource.data.professionalId == uid());
+      allow write: if false;
+    }
+
+    match /revocations/{revocationId} {
+      allow get: if isAdmin()
+                 || (signedIn() && uid() in resource.data.get('partyIds', []));
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /auditLog/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* supportTickets                                                         */
+    /* --------------------------------------------------------------------- */
+
+    match /supportTickets/{ticketId} {
+      allow get: if isAdmin() || (signedIn() && resource.data.openedBy == uid());
+      allow list: if isAdmin();
+      allow create: if emailVerified()
+                    && request.resource.data.openedBy == uid()
+                    && request.resource.data.get('status', 'open') == 'open';
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* adminSettings                                                          */
+    /* --------------------------------------------------------------------- */
+
+    match /adminSettings/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Legacy Phase 1 collections.                                            */
+    /* Locked to admin while Stage 6 migrates them. Phase 1 left these open    */
+    /* to any signed-in user.                                                  */
+    /* --------------------------------------------------------------------- */
+
+    match /formSubmissions/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.get('userId', null) == uid());
+      allow write: if false;
+    }
+
+    match /paymentTransactions/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.get('userId', null) == uid());
+      allow write: if false;
+    }
+
+    match /commissionerApplications/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.get('userId', null) == uid());
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Default deny. Anything not named above is closed.                      */
+    /* --------------------------------------------------------------------- */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

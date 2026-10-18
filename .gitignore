@@ -9,10 +9,12 @@ node_modules/
 .env.test
 .env*.local
 
-# Secrets / credentials - never commit
+# Secrets / credentials — never commit. Use env vars (see .env.example).
 *firebase-adminsdk*.json
+*service-account*.json
 service-account*.json
 *.pem
+*.key
 
-# OS
+# OS noise
 .DS_Store
