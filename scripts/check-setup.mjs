@@ -212,16 +212,18 @@ heading('4. Stage 2 — not required yet');
 
 const STAGE_2 = {
   RESEND_API_KEY: 'verification and approval emails actually send',
-  STRIPE_SECRET_KEY: 'subscriptions and payouts',
+  STRIPE_SECRET_KEY: 'subscriptions (Attorneys and Businesses)',
+  WIPAY_API_KEY: 'Caribbean card collection — sandbox works without it',
   DIDIT_API_KEY: 'identity verification',
   ZEGOCLOUD_SERVER_SECRET: 'video sessions',
-  CLOUDINARY_API_SECRET: 'signed certificate uploads',
 };
 
 for (const [key, purpose] of Object.entries(STAGE_2)) {
   if (process.env[key]) ok(`${key} — ${purpose}`);
   else info(`${key} not set — ${purpose}`);
 }
+
+info('None of the above block the app from running. Leave them blank for now.');
 
 if (!process.env.RESEND_API_KEY) {
   warn('Without RESEND_API_KEY, verification emails are logged to the console, not sent.');
