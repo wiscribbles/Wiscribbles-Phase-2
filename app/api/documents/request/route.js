@@ -22,6 +22,7 @@ import {
   selectableFor,
   submitRequest,
 } from '@/lib/clientRequests';
+import { FeeError, quote } from '@/lib/fees';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,31 @@ export async function GET(request) {
       const status = await requestStatusFor({ uid: user.uid, documentId: statusOf });
       if (!status) return NextResponse.json({ error: 'not_found' }, { status: 404 });
       return NextResponse.json({ status });
+    }
+
+    /* A live quote as the wizard is filled in. Server-side rather than
+       computed in the browser, so what the client is shown is the same
+       calculation that will be charged — and the price list cannot be edited
+       in devtools before submission. */
+    if (searchParams.get('quote') === '1') {
+      try {
+        return NextResponse.json({
+          quote: quote({
+            notarized: searchParams.get('notarized') === 'true',
+            signatories: Number(searchParams.get('signatories') ?? 1),
+            witnesses: Number(searchParams.get('witnesses') ?? 0),
+            seals: Number(searchParams.get('seals') ?? 1),
+          }),
+        });
+      } catch (error) {
+        if (error instanceof FeeError) {
+          return NextResponse.json(
+            { error: error.code, message: error.message, field: error.field },
+            { status: 422 },
+          );
+        }
+        throw error;
+      }
     }
 
     const jurisdiction = searchParams.get('jurisdiction');
@@ -146,6 +172,9 @@ export async function POST(request) {
         name: body?.name ?? null,
         sizeBytes: verified.bytes ?? null,
         pageCount: Number.isInteger(body?.pageCount) ? body.pageCount : null,
+        signatories: Number(body?.signatories ?? 1),
+        witnesses: Number(body?.witnesses ?? 0),
+        seals: Number(body?.seals ?? 1),
         acceptances: {
           termsVersion: String(body?.acceptances?.termsVersion ?? ''),
           disclaimerVersion: String(body?.acceptances?.disclaimerVersion ?? ''),

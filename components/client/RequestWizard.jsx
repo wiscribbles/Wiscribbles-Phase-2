@@ -40,6 +40,12 @@ export default function RequestWizard({ locale }) {
   const [upload, setUpload] = useState(null); // { path, bytes, name }
   const [documentName, setDocumentName] = useState('');
 
+  /* Who is involved, and how many seals. These drive the fee AND how many
+     people the session has to admit — a notarisation with two signatories and
+     a witness is four people in the room, not two. */
+  const [parties, setParties] = useState({ signatories: 1, witnesses: 0, seals: 1 });
+  const [feeQuote, setFeeQuote] = useState(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -87,6 +93,39 @@ export default function RequestWizard({ locale }) {
     setChoice((current) => ({ ...current, templateId: '' }));
   }, [choice.requestedService, choice.jurisdiction, loadTemplates]);
 
+  /* The quote comes from the server as the client fills the form in. Doing the
+     arithmetic here instead would mean the number shown and the number charged
+     were computed by two different pieces of code — and only one of them is
+     the one that counts. The site's own Terms of Service clause 5 requires the
+     fee to be shown before the transaction completes. */
+  const notarized = Boolean(
+    options?.services?.find((s) => s.value === choice.requestedService)?.serviceType,
+  );
+
+  useEffect(() => {
+    if (!choice.requestedService) {
+      setFeeQuote(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const query = new URLSearchParams({
+          quote: '1',
+          notarized: String(notarized),
+          signatories: String(parties.signatories),
+          witnesses: String(parties.witnesses),
+          seals: String(parties.seals),
+        });
+        const response = await fetch(`/api/documents/request?${query}`, { cache: 'no-store' });
+        const payload = await response.json().catch(() => ({}));
+        setFeeQuote(response.ok ? payload.quote : null);
+      } catch {
+        setFeeQuote(null);
+      }
+    })();
+  }, [notarized, parties, choice.requestedService]);
+
   const go = (direction) => {
     const index = STEPS.indexOf(step);
     const next = STEPS[index + direction];
@@ -132,6 +171,9 @@ export default function RequestWizard({ locale }) {
           templateId: choice.templateId,
           storagePath: upload?.path,
           name: documentName,
+          signatories: parties.signatories,
+          witnesses: parties.witnesses,
+          seals: parties.seals,
           acceptances: {
             termsVersion: options.termsVersion,
             disclaimerVersion: options.disclaimer.version,
@@ -421,8 +463,21 @@ export default function RequestWizard({ locale }) {
                   </summary>
                   <ul className="mt-2" style={{ fontSize: '0.84rem', color: COLORS.inkMuted, lineHeight: 1.6 }}>
                     {templates.unavailable.map((template) => (
-                      <li key={template.id} className="mb-1">
+                      <li key={template.id} className="mb-2">
                         <strong>{template.name}</strong> — {template.reason}
+                        {/* An exclusion is not a dead end. Six of the eight
+                            documents the home page advertises land here, so
+                            offering the paper route is the difference between
+                            a product and an apology. */}
+                        {template.prepareRegisterEligible && (
+                          <a
+                            className="d-inline-block mt-1"
+                            style={{ fontSize: '0.84rem' }}
+                            href={`/${locale}/prepare-register?category=${encodeURIComponent(template.documentCategory ?? '')}&jurisdiction=${encodeURIComponent(choice.jurisdiction)}`}
+                          >
+                            Have it prepared and signed on paper instead →
+                          </a>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -495,6 +550,86 @@ export default function RequestWizard({ locale }) {
             />
           </div>
 
+          {/* ---- who is involved ---- */}
+          <fieldset className="mb-3">
+            <legend className="form-label" style={{ fontWeight: 500, fontSize: '1rem' }}>
+              Who is involved?
+            </legend>
+
+            <div className="row g-3" style={{ maxWidth: 560 }}>
+              <div className="col-6 col-md-4">
+                <label className="form-label" htmlFor="req-signatories" style={{ fontSize: '0.86rem' }}>
+                  Signatories
+                </label>
+                <input
+                  id="req-signatories"
+                  type="number"
+                  className="form-control"
+                  min={1}
+                  max={options.priceList?.limits?.MAX_SIGNATORIES ?? 10}
+                  value={parties.signatories}
+                  onChange={(e) =>
+                    setParties({ ...parties, signatories: Math.max(1, Number(e.target.value) || 1) })
+                  }
+                />
+                <p className="mb-0 mt-1" style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}>
+                  Including you.
+                </p>
+              </div>
+
+              {notarized && (
+                <>
+                  <div className="col-6 col-md-4">
+                    <label className="form-label" htmlFor="req-witnesses" style={{ fontSize: '0.86rem' }}>
+                      Witnesses
+                    </label>
+                    <input
+                      id="req-witnesses"
+                      type="number"
+                      className="form-control"
+                      min={0}
+                      max={options.priceList?.limits?.MAX_WITNESSES ?? 4}
+                      value={parties.witnesses}
+                      onChange={(e) =>
+                        setParties({ ...parties, witnesses: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                    />
+                    <p className="mb-0 mt-1" style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}>
+                      If the document needs them.
+                    </p>
+                  </div>
+
+                  <div className="col-6 col-md-4">
+                    <label className="form-label" htmlFor="req-seals" style={{ fontSize: '0.86rem' }}>
+                      Seals
+                    </label>
+                    <input
+                      id="req-seals"
+                      type="number"
+                      className="form-control"
+                      min={1}
+                      max={options.priceList?.limits?.MAX_SEALS ?? 5}
+                      value={parties.seals}
+                      onChange={(e) =>
+                        setParties({ ...parties, seals: Math.max(1, Number(e.target.value) || 1) })
+                      }
+                    />
+                    <p className="mb-0 mt-1" style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}>
+                      Usually one.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {feeQuote && (
+              <p className="mb-0 mt-2" style={{ fontSize: '0.86rem', color: COLORS.inkSubtle }}>
+                Fee so far: <strong>{feeQuote.formattedTotal}</strong> — itemised on the
+                next step.
+              </p>
+            )}
+          </fieldset>
+
           <div className="d-flex gap-2">
             <button
               type="button"
@@ -517,21 +652,75 @@ export default function RequestWizard({ locale }) {
         <section>
           <h2 style={STYLES.sectionHeading}>Payment</h2>
 
+          {/* ---- the itemised quote ---- */}
+          {feeQuote && (
+            <div className="p-3 mt-3 mb-3" style={STYLES.card}>
+              <table className="table table-sm mb-0" style={{ fontSize: '0.88rem' }}>
+                <tbody>
+                  {feeQuote.lines.map((line) => (
+                    <tr key={line.key}>
+                      <td style={{ border: 'none', paddingLeft: 0 }}>
+                        {line.label}
+                        {line.note && (
+                          <span
+                            className="d-block"
+                            style={{ fontSize: '0.78rem', color: COLORS.inkMuted }}
+                          >
+                            {line.note}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className="text-end"
+                        style={{ border: 'none', paddingRight: 0, whiteSpace: 'nowrap' }}
+                      >
+                        {line.amountCents === 0
+                          ? 'No charge'
+                          : `$${(line.amountCents / 100).toFixed(2)}`}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td
+                      style={{
+                        borderTop: `1px solid ${COLORS.border}`,
+                        paddingLeft: 0,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Total
+                    </td>
+                    <td
+                      className="text-end"
+                      style={{
+                        borderTop: `1px solid ${COLORS.border}`,
+                        paddingRight: 0,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {feeQuote.formattedTotal}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <div
-            className="p-3 mt-3 mb-3"
+            className="p-3 mb-3"
             style={{ ...STYLES.card, background: COLORS.surface, borderRadius: RADIUS.md }}
           >
             <p className="mb-2" style={{ fontSize: '0.9rem', color: COLORS.inkSubtle, lineHeight: 1.7 }}>
-              <strong>Payment is not being collected yet.</strong> Card
-              collection works, but the other half of the money flow — how the
-              service fee reaches the professional who does the work — depends
-              on a money-transmission question that is still being settled.
-              Taking your money before the platform can pay out on it would be
-              the wrong way round.
+              <strong>This is the fee, but it is not being collected yet.</strong>{' '}
+              Card collection works. What is outstanding is the other half of the
+              money flow — how the service fee reaches the professional who does
+              the work — which depends on a money-transmission question still
+              being settled. Taking your money before the platform can pay out
+              on it would be the wrong way round.
             </p>
             <p className="mb-0" style={{ fontSize: '0.88rem', color: COLORS.inkMuted, lineHeight: 1.7 }}>
-              Your request goes through at no charge. You will be told the fee
-              before anything is charged in future.
+              Your request goes through at no charge, and the quote above is
+              recorded against it so you can see what it would have been.
             </p>
           </div>
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, LayoutDashboard, Users, FileText, CreditCard, ShieldCheck, Settings, LogOut, UserCheck, FileCheck, Archive } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Users, FileText, CreditCard, ShieldCheck, Settings, LogOut, UserCheck, FileCheck, Archive, PenLine } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/firebase';
 import { signOut } from 'firebase/auth';
@@ -44,6 +44,12 @@ const navigationItems = [
     slug: '/documents',
     icon: Archive,
     description: 'Every executed document, with audit, flag and revoke',
+  },
+  {
+    label: 'Prepare & Register',
+    slug: '/prepare-register',
+    icon: PenLine,
+    description: 'Documents the statute excludes — prepared online, signed on paper',
   },
   {
     label: 'Notarizations',

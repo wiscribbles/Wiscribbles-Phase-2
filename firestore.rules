@@ -255,6 +255,20 @@ service cloud.firestore {
     }
 
     /* --------------------------------------------------------------------- */
+    /* prepareRegisterRequests                                                */
+    /* The wet-ink route for documents the statute excludes from electronic   */
+    /* execution. Server-written: the eligibility check (is this category     */
+    /* actually excluded in that jurisdiction?) and the status state machine   */
+    /* both live in route handlers, and a rule cannot express either.          */
+    /* --------------------------------------------------------------------- */
+
+    match /prepareRegisterRequests/{requestId} {
+      allow get: if isAdmin() || (signedIn() && resource.data.clientId == uid());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
     /* acceptances                                                            */
     /* What each party agreed to, and WHICH VERSION of the text they agreed   */
     /* to. A tick box that gates a button and is then forgotten proves        */
