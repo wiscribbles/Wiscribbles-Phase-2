@@ -66,9 +66,7 @@ The real rules are in `firestore.rules` in this repo and get deployed in step 7.
 
 Storage → Get started. Production mode, same location.
 
-Phase 1 sent uploads to Cloudinary rather than Firebase Storage, so this is
-mostly provisioning ahead of Stage 2. Set it up now so the bucket name exists
-for `.env`.
+All file storage runs through this bucket — certificates, identification, signatures and documents. Cloudinary was removed on 18 Oct 2026, so this is no longer optional.
 
 ## 6. Generate an Admin SDK key
 
@@ -122,7 +120,7 @@ against the project structure, not against live admin access. If a step ever
 seems to require me to hold that key, it means the step is wrong.
 
 See `.env.example` for the full list including Stripe, Resend, ZegoCloud and
-Cloudinary.
+
 
 ---
 

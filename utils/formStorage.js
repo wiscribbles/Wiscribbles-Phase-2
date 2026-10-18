@@ -1,3 +1,4 @@
+import { uploadFile } from '@/lib/storage/client';
 // Utility functions to handle form data in localStorage
 
 const FORM_DATA_KEY = 'form2_data';
@@ -111,49 +112,16 @@ export const getSubmissionId = () => {
   }
 };
 
-// Utility function to upload file to Cloudinary
-export const uploadToCloudinary = async (file, folder = '') => {
+// Utility function to upload a file to Firebase Storage
+export const uploadStoredPdf = async (file, folder = '') => {
+  // Name kept so existing call sites still work; the implementation is now
+  // Firebase Storage via /api/uploads. Cloudinary is gone, along with the
+  // cloud name and unsigned preset this function used to carry in the browser.
   if (!file) return null;
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'wiscribbles');
-    formData.append('cloud_name', 'dgyv432jt');
-
-    if (folder) {
-      formData.append('folder', folder);
-    }
-
-    // Determine the correct endpoint based on file type
-    const isPDF = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
-    const uploadEndpoint = isPDF 
-      ? 'https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload'
-      : 'https://api.cloudinary.com/v1_1/dgyv432jt/image/upload';
-    
-    // Add resource_type for PDFs
-    if (isPDF) {
-      formData.append('resource_type', 'raw');
-    }
-
-    console.log(`Uploading ${isPDF ? 'PDF' : 'image'} to Cloudinary:`, file.name);
-
-    const response = await fetch(uploadEndpoint, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Cloudinary upload failed:', response.status, errorText);
-      throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('Cloudinary upload successful:', data.secure_url);
-    return data.secure_url;
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw error;
-  }
+  const purpose = folder.includes('signature') ? 'signature'
+    : folder.includes('identification') ? 'identification'
+    : folder.includes('certificate') ? 'certificate'
+    : 'generated';
+  const { url } = await uploadFile(file, { purpose });
+  return url;
 };

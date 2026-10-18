@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { uploadGeneratedPdf } from '@/lib/storage/server';
 import { requireNotary } from '@/lib/serverAuth';
 import { isTrustedDocumentUrl } from '@/lib/apiUtils';
 import { adminDb } from '@/lib/firebase-admin';
@@ -7,46 +8,10 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
 
-async function uploadToCloudinary(fileBuffer, fileName = 'notarized_document') {
-  try {
-    // Convert buffer to base64 for upload
-    const base64Data = Buffer.from(fileBuffer).toString('base64');
-    const dataURI = `data:application/pdf;base64,${base64Data}`;
-    
-    console.log('Uploading notarized PDF to Cloudinary, size:', fileBuffer.length, 'bytes');
-
-    const uploadData = {
-      file: dataURI,
-      upload_preset: 'wiscribbles',
-      folder: 'notarized-documents',
-      resource_type: 'raw',
-      public_id: `${fileName}_${Date.now()}.pdf`
-    };
-
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(uploadData),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Cloudinary response not ok:', response.status, errorText);
-      throw new Error(`Cloudinary upload failed: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('Cloudinary upload successful:', data.secure_url);
-    return data.secure_url;
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw new Error(`Failed to upload to Cloudinary: ${error.message}`);
-  }
+async function uploadStoredPdf(fileBuffer) {
+  // Firebase Storage. Replaces the Cloudinary upload this route used to
+  // carry its own copy of, hardcoded cloud name and unsigned preset included.
+  return uploadGeneratedPdf({ buffer: fileBuffer, folder: 'notarized-documents', filename: 'notarized-document.pdf' });
 }
 
 async function addNotaryStampToPDF(pdfUrl, notaryInfo, clientInfo, acknowledgmentData, notarySignatures = []) {
@@ -644,9 +609,9 @@ export async function POST(request) {
     try {
       console.log('Adding notary stamp to PDF...');
       const modifiedPdfBytes = await addNotaryStampToPDF(documentUrl, notaryInfo, clientInfo, body.acknowledgmentData, notarySignatures);
-      console.log('PDF notarized successfully, uploading to Cloudinary...');
+      console.log('PDF notarized successfully, uploading to storage...');
       
-      const notarizedDocUrl = await uploadToCloudinary(modifiedPdfBytes, 'notarized_document');
+      const notarizedDocUrl = await uploadStoredPdf(modifiedPdfBytes, 'notarized_document');
       console.log('Notarized document uploaded:', notarizedDocUrl);
 
       // If sessionId is provided, update the session/submission in Firebase

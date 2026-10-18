@@ -38,7 +38,7 @@ import CountrySelect from "@/components/CountrySelect";
 import useForm2store from "@/store/form2store";
 import { useFormSteps } from "@/hooks/useFormSteps";
 import FormProgressSidebar from './FormProgressSidebar';
-import { saveFormData, getFormData, uploadToCloudinary } from '@/utils/formStorage';
+import { saveFormData, getFormData, uploadStoredPdf } from '@/utils/formStorage';
 
 import {  Upload } from 'lucide-react'
 
@@ -432,16 +432,16 @@ const Form2step1 = ({ totalSteps }) => {
       // Run OCR verification with current form data
       await verifyDocumentWithOCR(file, { ...formData, ...currentFormValues });
       
-      // Upload to Cloudinary (if needed) - do this after OCR to avoid blocking
+      // Upload to Firebase Storage
       try {
-        const imageUrl = await uploadToCloudinary(file, 'identification');
+        const imageUrl = await uploadStoredPdf(file, 'identification');
         setFormData(prev => ({
           ...prev,
           identificationImageUrl: imageUrl
         }));
       } catch (error) {
-        console.warn('Cloudinary upload failed:', error);
-        // Don't block the process if Cloudinary fails
+        console.warn('Upload failed:', error);
+        // Don't block the process if the upload fails
       }
     }
   };

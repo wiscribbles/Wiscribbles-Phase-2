@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { uploadToCloudinary } from '@/utils/formStorage';
+import { uploadStoredPdf } from '@/utils/formStorage';
 
 const UploadDocumentForm = ({ formData = {}, onFormDataChange, onProceed }) => {
   console.log('UploadDocumentForm - Component is rendering!');
@@ -57,8 +57,8 @@ const UploadDocumentForm = ({ formData = {}, onFormDataChange, onProceed }) => {
         setIsUploading(true);
         setUploadedFile(file);
         
-        // Upload to Cloudinary
-        const documentUrl = await uploadToCloudinary(file, 'user-documents');
+        // Upload to Firebase Storage
+        const documentUrl = await uploadStoredPdf(file, 'user-documents');
         
         setLocalFormData(prev => ({ 
           ...prev, 

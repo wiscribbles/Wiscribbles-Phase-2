@@ -1,5 +1,6 @@
 'use client';
 
+import { uploadPdf } from '@/lib/storage/client';
 import { authFetch } from '@/utils/authFetch';
 import React, { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -241,21 +242,17 @@ const generateReferenceNumber = () => {
   return `${prefix}${timestamp}${random}`;
 };
 
-// Function to add footer text and page numbers to a PDF from Cloudinary
 const addFooterToPDF = async (pdfUrl, footerText) => {
   try {
-    console.log('Starting PDF modification for Cloudinary URL...');
 
-    // IMPORTANT: Replace with your Cloudinary details
-    const CLOUDINARY_CLOUD_NAME = 'dgyv432jt'; 
-    const CLOUDINARY_UPLOAD_PRESET = 'wiscribbles';
 
-    // 1. Fetch the original PDF from Cloudinary
-    // We need to use a CORS proxy to fetch the PDF from the client-side if CORS is not enabled on your Cloudinary account.
-    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const response = await fetch(`${proxyUrl}${pdfUrl}`);
+    // Fetched through our own server, which validates the URL against our
+    // Storage bucket. Phase 1 routed every document through the public
+    // cors-anywhere.herokuapp.com demo proxy - legal documents passing
+    // through an uncontrolled third party.
+    const response = await authFetch(`/api/download-document?url=${encodeURIComponent(pdfUrl)}`);
     if (!response.ok) {
-      throw new Error(`Failed to fetch PDF from Cloudinary: ${response.statusText}`);
+      throw new Error(`Failed to fetch the document: ${response.statusText}`);
     }
     const pdfBytes = await response.arrayBuffer();
     
@@ -285,29 +282,13 @@ const addFooterToPDF = async (pdfUrl, footerText) => {
     // 3. Serialize the modified PDF
     const modifiedPdfBytes = await pdfDoc.save();
     
-    // 4. Upload the modified PDF back to Cloudinary
-    const formData = new FormData();
-    formData.append('file', new Blob([modifiedPdfBytes], { type: 'application/pdf' }));
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-
-    const cloudinaryResponse = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
+    // Uploaded through /api/uploads, which authenticates the caller and
+    // enforces the size and type limits server-side.
+    const { url } = await uploadPdf(
+      new File([modifiedPdfBytes], 'document.pdf', { type: 'application/pdf' }),
+      { purpose: 'generated' },
     );
-
-    if (!cloudinaryResponse.ok) {
-      const errorData = await cloudinaryResponse.json();
-      throw new Error(`Failed to upload modified PDF to Cloudinary: ${JSON.stringify(errorData)}`);
-    }
-
-    const cloudinaryData = await cloudinaryResponse.json();
-    console.log('Modified PDF uploaded to Cloudinary:', cloudinaryData.secure_url);
-    
-    // 5. Return the new Cloudinary URL
-    return cloudinaryData.secure_url;
+    return url;
     
   } catch (error) {
     console.error('Error modifying PDF:', error);

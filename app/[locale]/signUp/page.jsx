@@ -3,7 +3,7 @@ import { Row, Col, Container } from "react-bootstrap";
 import "react-phone-input-2/lib/bootstrap.css";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import SignUpForm from "@/components/SignUpForm2";
+import SignUpForm from "@/components/auth/SignUpForm";
 
 const SignUp = () => {
   const st = useTranslations("sign-up");

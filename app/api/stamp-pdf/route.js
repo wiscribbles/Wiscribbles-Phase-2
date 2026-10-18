@@ -6,46 +6,10 @@ import { adminDb } from '@/lib/firebase-admin';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 
-async function uploadToCloudinary(fileBuffer) {
-  try {
-    // Convert buffer to base64 for upload
-    const base64Data = Buffer.from(fileBuffer).toString('base64');
-    const dataURI = `data:application/pdf;base64,${base64Data}`;
-    
-    console.log('Uploading PDF to Cloudinary, size:', fileBuffer.length, 'bytes');
-
-    const uploadData = {
-      file: dataURI,
-      upload_preset: 'wiscribbles',
-      folder: 'stamped-documents',
-      resource_type: 'raw',
-      public_id: `signed_document_${Date.now()}.pdf`
-    };
-
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(uploadData),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Cloudinary response not ok:', response.status, errorText);
-      throw new Error(`Cloudinary upload failed: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('Cloudinary upload successful:', data.secure_url);
-    return data.secure_url;
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    throw new Error(`Failed to upload to Cloudinary: ${error.message}`);
-  }
+async function uploadStoredPdf(fileBuffer) {
+  // Firebase Storage. Replaces the Cloudinary upload this route used to
+  // carry its own copy of, hardcoded cloud name and unsigned preset included.
+  return uploadGeneratedPdf({ buffer: fileBuffer, folder: 'stamped-documents', filename: 'signed-document.pdf' });
 }
 
 async function addFooterToPDF(pdfUrl, footerText, userSignatures = []) {
@@ -273,10 +237,10 @@ export async function POST(request) {
     try {
       console.log('Adding footer and signatures to PDF...');
       const modifiedPdfBytes = await addFooterToPDF(originalDocUrl, footerText, userSignatures);
-      console.log('PDF modified successfully, uploading to Cloudinary...');
+      console.log('PDF modified successfully, uploading to storage...');
       
-      const approvedDocURL = await uploadToCloudinary(modifiedPdfBytes);
-      console.log('Uploaded to Cloudinary:', approvedDocURL);
+      const approvedDocURL = await uploadStoredPdf(modifiedPdfBytes);
+      console.log('Uploaded to storage:', approvedDocURL);
 
       // Update Firebase with both the approved URL and reference number
       const updateData = {

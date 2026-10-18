@@ -81,7 +81,7 @@ Legend: **Present** = works as specified · **Partial** = exists, needs rework �
 | Redirect `pending_review` → `/onboarding/verification` | **Absent** | Route does not exist. Build + server guard. |
 | Jurisdiction(s) of practice capture | **Partial** | Collected at sign-up as a single value; needs to move to Account tab and become multi-select. |
 | KYC trigger from Account tab | **Absent** | Build on the new adapter. |
-| Certificate upload, 25MB cap | **Partial** | Cloudinary upload exists in sign-up (unsigned preset, no size/type validation). Move, harden, cap. |
+| Certificate upload, 25MB cap | **Done** | Cloudinary removed entirely. `/api/uploads` authenticates the caller, enforces the 25MB cap and the permitted content types, and derives the storage path from the session rather than from the request. `storage.rules` enforces the same limits on any direct client write. |
 | Bank capture + tokenization (Financials) | **Absent** | Stripe Connect onboarding. |
 | Status tracker + `admin_feedback` + resubmission | **Absent** | Build. |
 | Notary post-approval: Account / Analytics / Support / Financials | **Absent** | Build all four. |
@@ -185,8 +185,7 @@ Stages 4 and 5 can run in parallel once 3 lands. 8 can be pulled forward at any 
    confirming before Stage 2 starts.** The platform-fee side (collecting from attorneys and
    businesses, many of them diaspora-facing) is less exposed.
 2. **Didit contract terms** are not yet verified against the 3 Sept figures.
-3. **The 25MB file cap** is stated as "e.g." in the brief. Cloudinary's free tier caps raw
-   uploads at 10MB; Firebase Storage does not. Confirm the number and the destination.
+3. **The 25MB file cap** is stated as "e.g." in the brief. Firebase Storage has no equivalent cap. Confirm the number.
 4. **Replacing the form-field model with PDF stamping discards `config/documentTypes.js`** —
    roughly 30KB of document definitions and every `DynamicFormRenderer` form. That content needs
    to reappear as uploaded PDF templates, which is a content-production task, not a code task,

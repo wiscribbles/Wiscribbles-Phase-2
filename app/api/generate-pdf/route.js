@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { uploadGeneratedPdf } from '@/lib/storage/server';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { adminDb } from '@/lib/firebase-admin';
 
@@ -31,38 +32,12 @@ const fetchDocumentFormData = async (documentType, userId, sessionId) => {
   }
 };
 
-// Helper function to upload PDF buffer to Cloudinary
-const uploadPDFToCloudinary = async (pdfBuffer, fileName) => {
-  try {
-    const formData = new FormData();
-    
-    // Create a File object from the buffer
-    const pdfFile = new File([pdfBuffer], fileName, { 
-      type: 'application/pdf' 
-    });
-    
-    formData.append('file', pdfFile);
-    formData.append('upload_preset', 'wiscribbles');
-    formData.append('cloud_name', 'dgyv432jt');
-    formData.append('resource_type', 'raw');
-    formData.append('folder', 'generated_documents');
-
-    const response = await fetch('https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Cloudinary upload failed: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result.secure_url;
-  } catch (error) {
-    console.error('Error uploading to Cloudinary:', error);
-    throw error;
-  }
-};
+// Upload a generated PDF to Firebase Storage
+async function uploadGeneratedDocument(pdfBuffer, fileName) {
+  // Firebase Storage. Replaces the Cloudinary upload this route used to
+  // carry its own copy of, hardcoded cloud name and unsigned preset included.
+  return uploadGeneratedPdf({ buffer: pdfBuffer, folder: 'generated-documents', filename: fileName });
+}
 
 // Generate Affidavit of Identity PDF using pdf-lib
 const generateAffidavitOfIdentityPDF = async (pdfDoc, formData) => {
@@ -606,15 +581,15 @@ export async function POST(request) {
     // Serialize PDF to bytes (a Uint8Array)
     const pdfBytes = await pdfDoc.save();
 
-    // Upload to Cloudinary
+    // Upload to Firebase Storage
     const fileName = `${documentType}-${Date.now()}.pdf`;
-    const cloudinaryUrl = await uploadPDFToCloudinary(pdfBytes, fileName);
+    const storedUrl = await uploadGeneratedDocument(pdfBytes, fileName);
 
-    console.log('PDF generated and uploaded successfully:', cloudinaryUrl);
+    console.log('PDF generated and uploaded successfully:', storedUrl);
 
     return NextResponse.json({
       success: true,
-      pdfUrl: cloudinaryUrl,
+      pdfUrl: storedUrl,
       fileName: fileName
     });
 

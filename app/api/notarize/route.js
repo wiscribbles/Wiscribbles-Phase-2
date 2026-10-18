@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { uploadGeneratedPdf } from '@/lib/storage/server';
 import { generateReferenceNumber } from '@/lib/referenceNumber';
 import { isTrustedDocumentUrl } from '@/lib/apiUtils';
 import { requireNotary } from '@/lib/serverAuth';
@@ -6,46 +7,10 @@ import { adminDb } from '@/lib/firebase-admin';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { v4 as uuidv4 } from 'uuid';
 
-async function uploadToCloudinary(fileBuffer) {
-  try {
-    // Create a FormData object for the upload
-    const formData = new FormData();
-    
-    // Create a blob from the buffer
-    const blob = new Blob([fileBuffer], { type: 'application/pdf' });
-    
-    // Append the blob as a file
-    formData.append('file', blob, 'stamped-document.pdf');
-    formData.append('upload_preset', 'WiScribbles');
-    formData.append('folder', 'approvedDocuments');
-    formData.append('resource_type', 'raw');
-    formData.append('access_mode', 'public'); // Ensure public access
-    
-    console.log('Uploading PDF to Cloudinary...');
-    
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload`,
-      {
-        method: 'POST',
-        body: formData, // Don't set Content-Type header, let FormData handle it
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Cloudinary upload failed:', errorText);
-      throw new Error(`Cloudinary upload failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('Cloudinary upload successful:', data.secure_url);
-    
-    // Use the secure_url directly - it should be publicly accessible since we set access_mode to public
-    return data.secure_url;
-  } catch (error) {
-    console.error('Error in uploadToCloudinary:', error);
-    throw error;
-  }
+async function uploadStoredPdf(fileBuffer) {
+  // Firebase Storage. Replaces the Cloudinary upload this route used to
+  // carry its own copy of, hardcoded cloud name and unsigned preset included.
+  return uploadGeneratedPdf({ buffer: fileBuffer, folder: 'notarized-documents', filename: 'notarized-document.pdf' });
 }
 
 async function addFooterToPDF(pdfUrl, footerText) {
@@ -62,7 +27,7 @@ async function addFooterToPDF(pdfUrl, footerText) {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch PDF from Cloudinary: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch the stored PDF: ${response.status} ${response.statusText}`);
     }
     
     console.log('PDF fetched successfully, processing...');
@@ -190,8 +155,8 @@ export async function POST(request) {
           const modifiedPdfBytes = await addFooterToPDF(originalDocUrl, footerText);
           console.log('✓ PDF modification completed, modified size:', modifiedPdfBytes.byteLength);
           
-          console.log('About to upload to Cloudinary...');
-          approvedDocURL = await uploadToCloudinary(modifiedPdfBytes);
+          console.log('About to upload to storage...');
+          approvedDocURL = await uploadStoredPdf(modifiedPdfBytes);
           
           console.log('=== COMPARISON ===');
           console.log('Original URL:  ', originalDocUrl);

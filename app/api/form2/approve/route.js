@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { uploadGeneratedPdf } from '@/lib/storage/server';
 import { escapeHtml, isTrustedDocumentUrl } from '@/lib/apiUtils';
 import { generateReferenceNumber } from '@/lib/referenceNumber';
 import { requireNotary } from '@/lib/serverAuth';
@@ -15,7 +16,7 @@ async function processAndUploadApprovedDocument(originalUrl, footerText, signing
   try {
     console.log('Processing approved document:', originalUrl);
     
-    // Download the original document from Cloudinary
+    // Download the original document from storage
     const response = await fetch(originalUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch document: ${response.statusText}`);
@@ -117,42 +118,18 @@ async function processAndUploadApprovedDocument(originalUrl, footerText, signing
     // Save the modified PDF
     const modifiedPdfBytes = await pdfDoc.save();
     
-    // Upload to Cloudinary directly to approvedDocument folder
-    const formData = new FormData();
-    const uniqueFilename = `approved_${referenceNumber}_${Date.now()}`;
-    const timestamp = Math.floor(Date.now() / 1000);
-    
-    formData.append('file', new Blob([modifiedPdfBytes], { type: 'application/pdf' }));
-    formData.append('public_id', `approvedDocument/${uniqueFilename}`);
-    formData.append('resource_type', 'raw');
-    formData.append('timestamp', timestamp.toString());
-    
-    // Create signature for authenticated upload (you'll need to add your API secret)
-    // For now, let's try with upload preset but force the folder
-    formData.append('upload_preset', 'wiscribbles');
-    formData.append('folder', 'approvedDocument');
-    
-    console.log('Uploading to Cloudinary with:');
-    console.log('- public_id: approvedDocument/' + uniqueFilename);
-    console.log('- folder: approvedDocument');
-    console.log('- resource_type: raw');
-    
-    const uploadResponse = await fetch(
-      `https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
-    
-    if (!uploadResponse.ok) {
-      const errorData = await uploadResponse.json();
-      throw new Error(`Failed to upload approved document: ${JSON.stringify(errorData)}`);
-    }
-    
-    const uploadData = await uploadResponse.json();
-    console.log('Approved document uploaded successfully:', uploadData.secure_url);
-    return uploadData.secure_url;
+    // Firebase Storage. Replaces an inline Cloudinary upload that carried the
+    // cloud name and an unsigned preset in the request body, with a comment
+    // noting the API secret was never wired up.
+    const approvedUrl = await uploadGeneratedPdf({
+      buffer: modifiedPdfBytes,
+      folder: 'approved-documents',
+      filename: `approved_${referenceNumber}.pdf`,
+      metadata: { referenceNumber: String(referenceNumber) },
+    });
+
+    console.log('Approved document uploaded successfully');
+    return approvedUrl;
     
   } catch (error) {
     console.error('Error in processAndUploadApprovedDocument:', error);

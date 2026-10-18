@@ -300,21 +300,32 @@ rewrite.
 
 ---
 
-## Part 8 — Cloudinary (file uploads)
+## Part 8 — File storage
 
-Stores professional certificates and uploaded documents.
+**Nothing to set up, and no keys.** Certificates, identification, signatures
+and documents all go to **Firebase Storage**, in the bucket you already
+configured as `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`.
 
-1. Sign in at cloudinary.com → Dashboard.
-2. ```
-   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
-   CLOUDINARY_API_KEY=
-   CLOUDINARY_API_SECRET=
-   ```
+There is one thing to deploy — the Storage rules, which are the equivalent of
+`firestore.rules` for files:
 
-The cloud name is public; the API secret is not. Phase 1 used an **unsigned**
-upload preset with the cloud name hardcoded in the browser, which meant anyone
-who viewed the page source could upload anything to your account at your
-expense. Stage 2 signs uploads server-side.
+```bash
+firebase deploy --only storage
+```
+
+Re-run that whenever `storage.rules` changes.
+
+Cloudinary was removed on 18 October 2026. It is worth knowing what it was
+doing, because the same mistake is easy to repeat: Phase 1 uploaded straight
+from the browser using an **unsigned** upload preset with the cloud name
+hardcoded in the page source, which meant anyone who viewed source could upload
+anything to the account at your expense. The cloud name `dgyv432jt` appeared in
+eight separate files, including server routes.
+
+Uploads now go through `/api/uploads`, which authenticates the caller, enforces
+the 25MB limit and the permitted content types, and — importantly — builds the
+storage path from the signed-in user rather than from anything the browser
+sends, so no one can write into another user's folder.
 
 ---
 

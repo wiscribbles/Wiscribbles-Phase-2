@@ -4,7 +4,7 @@ import { Button, Container, Form, Alert } from 'react-bootstrap';
 import PDFViewer from '@/components/PDFViewer';
 
 const PDFTestPage = () => {
-  const [pdfUrl, setPdfUrl] = useState('https://res.cloudinary.com/dgyv432jt/raw/upload/v1756295187/user-documents/PrintDupBill1_a90loj.pdf');
+  const [pdfUrl, setPdfUrl] = useState('');
   const [testUrl, setTestUrl] = useState('');
   const [showViewer, setShowViewer] = useState(false);
   const [testResults, setTestResults] = useState('');

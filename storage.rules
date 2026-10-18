@@ -1,0 +1,145 @@
+rules_version = '2';
+
+/**
+ * WiScribbles Firebase Storage rules — Phase 2.
+ *
+ * Everything now lives here; Cloudinary is gone. Phase 1 uploaded through an
+ * UNSIGNED Cloudinary preset with the cloud name hardcoded in client-side
+ * code, so anyone reading the page source could upload anything to the
+ * account. These rules are the replacement for that absence of control.
+ *
+ * Role and status come from the AUTH TOKEN (custom claims), never from a
+ * document a user might be able to write. Claims are set only by the Admin
+ * SDK, server-side, in lib/auth/claims.js.
+ *
+ * The Admin SDK bypasses these rules — intended. Server-side writes go through
+ * lib/storage/server.js, which applies the same size and type limits in code.
+ *
+ * Deploy:  firebase deploy --only storage
+ */
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    /* --------------------------------------------------------------------- */
+    /* Helpers                                                                */
+    /* --------------------------------------------------------------------- */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function emailVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.get('role', 'client') : 'client';
+    }
+
+    function status() {
+      return signedIn() ? request.auth.token.get('status', 'email_unverified') : 'email_unverified';
+    }
+
+    function isAdmin() {
+      return role() == 'admin';
+    }
+
+    function isApprovedPartner() {
+      return emailVerified()
+        && status() == 'approved'
+        && role() in ['notary', 'coath', 'attorney', 'business'];
+    }
+
+    /** Brief: "Max File Size: Must adhere to the system limit (e.g. 25MB)". */
+    function withinSizeLimit() {
+      return request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    function isPdf() {
+      return request.resource.contentType == 'application/pdf';
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|heic)');
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* A user's own files                                                     */
+    /*                                                                        */
+    /* Professional certificates, identification, signature images. Written   */
+    /* by the owner during onboarding; read by the owner and by the Website   */
+    /* Manager reviewing the application.                                     */
+    /* --------------------------------------------------------------------- */
+
+    match /users/{userId}/{category}/{fileName} {
+
+      function isOwner() {
+        return signedIn() && request.auth.uid == userId;
+      }
+
+      allow read: if isOwner() || isAdmin();
+
+      allow write: if isOwner()
+                   && emailVerified()
+                   && withinSizeLimit()
+                   && (isPdf() || isImage())
+                   && category in ['certificates', 'identification', 'signatures', 'generated'];
+
+      // Replacing a certificate is a write, not a delete. Removal is an
+      // admin action so the review trail cannot be erased by its subject.
+      allow delete: if isAdmin();
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Documents                                                              */
+    /*                                                                        */
+    /* Reads are deliberately NOT granted here. A document's parties live in  */
+    /* Firestore and Storage rules cannot read Firestore, so access is served */
+    /* by the server through short-lived signed URLs after it has checked who */
+    /* is asking. Granting read to any signed-in user would expose every      */
+    /* notarised document on the platform to every account.                   */
+    /* --------------------------------------------------------------------- */
+
+    match /documents/{documentId}/{allPaths=**} {
+      allow read: if isAdmin();
+      // Uploads go through a server route that binds the document to a
+      // template and a jurisdiction first.
+      allow write, delete: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Virtual stamps (e-seals)                                               */
+    /*                                                                        */
+    /* A notary's seal. Readable by its owner and by admins; never writable   */
+    /* from the browser, because a seal a user can overwrite is not a seal.   */
+    /* --------------------------------------------------------------------- */
+
+    match /stamps/{professionalId}/{fileName} {
+      allow read: if (signedIn() && request.auth.uid == professionalId) || isAdmin();
+      allow write, delete: if false;
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Support attachments                                                    */
+    /* --------------------------------------------------------------------- */
+
+    match /support/{userId}/{fileName} {
+      allow read: if (signedIn() && request.auth.uid == userId) || isAdmin();
+      allow write: if signedIn()
+                   && request.auth.uid == userId
+                   && emailVerified()
+                   && withinSizeLimit()
+                   && (isPdf() || isImage());
+      allow delete: if isAdmin();
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Default deny                                                           */
+    /* --------------------------------------------------------------------- */
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

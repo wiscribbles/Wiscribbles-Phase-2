@@ -163,11 +163,7 @@ Also: are these billed in GYD or USD? It changes the Stripe configuration.
 
 And one decision I need rather than an account:
 
-- **Where do professional certificates go** — Cloudinary with signed uploads, or
-  Firebase Storage? Phase 1 used Cloudinary with an *unsigned* preset and the
-  cloud name hardcoded in the browser, meaning anyone could upload to your
-  account. Either destination is fine; Firebase Storage is one less vendor and
-  you have it already. Cloudinary is better if you want transformations.
+- **Where professional certificates go — SETTLED.** Firebase Storage, decided 18 Oct 2026. Cloudinary has been removed entirely. No extra vendor, no extra keys, and uploads now run through an authenticated server route instead of an unsigned preset exposed in the browser.
 
 ---
 

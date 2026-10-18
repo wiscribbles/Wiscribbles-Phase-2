@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ALLOWED_DOCUMENT_TYPES, ALLOWED_IMAGE_TYPES, getTokenUrl, uniqueFilename, uploadBuffer } from '@/lib/storage/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,54 +11,27 @@ export async function POST(request) {
     // Generate UUID reference number
     const referenceNumber = uuidv4();
 
-    // Upload files to Cloudinary if they exist
-    const uploadFileToCloudinary = async (file, folder = '') => {
+    // Upload files to Firebase Storage if they exist
+        const uploadAttachment = async (file, folder = '') => {
+      // Firebase Storage. Replaces an inline Cloudinary upload that carried
+      // the cloud name and an unsigned preset.
       if (!file) return null;
-
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', 'wiscribbles');
-        formData.append('cloud_name', 'dgyv432jt');
-        
-        if (folder) {
-          formData.append('folder', folder);
-        }
-
-        // Determine the correct endpoint based on file type
-        const isPDF = file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
-        const uploadEndpoint = isPDF 
-          ? 'https://api.cloudinary.com/v1_1/dgyv432jt/raw/upload'
-          : 'https://api.cloudinary.com/v1_1/dgyv432jt/image/upload';
-        
-        // Add resource_type for PDFs
-        if (isPDF) {
-          formData.append('resource_type', 'raw');
-        }
-
-        const response = await fetch(uploadEndpoint,
-          {
-            method: 'POST',
-            body: formData,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return data.secure_url;
-      } catch (error) {
-        console.error('Cloudinary upload error:', error);
-        throw error;
-      }
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const isPdf = file.type === 'application/pdf';
+      const path = `form2/${folder || 'uploads'}/${uniqueFilename(file.name, isPdf ? 'document.pdf' : 'image')}`;
+      const result = await uploadBuffer({
+        buffer,
+        path,
+        contentType: file.type || 'application/octet-stream',
+        allowedTypes: [...ALLOWED_DOCUMENT_TYPES, ...ALLOWED_IMAGE_TYPES],
+      });
+      return getTokenUrl(result.path, result.token);
     };
 
     // Upload identification image if it exists
     let identificationImageUrl = null;
     if (formData.identificationImage) {
-      identificationImageUrl = await uploadFileToCloudinary(
+      identificationImageUrl = await uploadAttachment(
         formData.identificationImage,
         'form_submissions/identification'
       );
@@ -66,7 +40,7 @@ export async function POST(request) {
     // Upload signature image if it exists
     let signatureImageUrl = null;
     if (formData.signatureImage) {
-      signatureImageUrl = await uploadFileToCloudinary(
+      signatureImageUrl = await uploadAttachment(
         formData.signatureImage,
         'form_submissions/signatures'
       );
