@@ -17,6 +17,24 @@
  * filtered out. An empty list reads as a broken website; "a will cannot be
  * executed electronically under the Act, it must be signed on paper" reads as
  * an answer.
+ *
+ * NO WITNESS OPTION — 19 OCTOBER 2026
+ *
+ * The party list used to offer a Witness role. It no longer does, and the
+ * removal is deliberate rather than an oversight. Adding a witness parked the
+ * finished document at `awaiting_in_person_witnessing`, a status with no route
+ * onward: nothing released it and nothing told the creator what to do, so a
+ * witness quietly destroyed the document after the client had worked through
+ * four screens. Meanwhile almost every instrument that classically needs a
+ * witness — wills, powers of attorney, deeds of land, trusts, leases,
+ * agreements of sale — is already outside the permitted catalogue and already
+ * routed to Prepare & Register.
+ *
+ * So every party added here is a signatory, and a client who says they need a
+ * witness is offered Prepare & Register: the same honest offer that flow
+ * already makes, which is everything online except the part the law reserves.
+ * The machinery is intact and dormant in `lib/signing.js`; what re-enables it
+ * is a written opinion and the jurisdiction flag, not a UI change.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -56,9 +74,12 @@ export default function RequestWizard({ locale, prefill = null }) {
   const [signingWindowDays, setSigningWindowDays] = useState(14);
   const [feeQuote, setFeeQuote] = useState(null);
 
-  const signatoryCount =
-    1 + otherParties.filter((p) => p.role !== 'witness' && p.email.trim()).length;
-  const witnessCount = otherParties.filter((p) => p.role === 'witness' && p.email.trim()).length;
+  /* Every added party is a signatory — see the note at the top of this file.
+     `witnesses` is still sent to the quote and the create call, hard-wired to
+     zero, because the fee engine and the API both still accept the field and a
+     silently absent parameter is harder to read later than an explicit nil. */
+  const signatoryCount = 1 + otherParties.filter((p) => p.email.trim()).length;
+  const witnessCount = 0;
 
   /* A form taken from the standard library arrives already copied into the
      client's repository, so the upload step is done before they get here. The
@@ -601,15 +622,15 @@ export default function RequestWizard({ locale, prefill = null }) {
               Who else signs this?
             </legend>
             <p style={{ ...STYLES.lede, fontSize: '0.84rem' }}>
-              You are the first signatory. Add anyone else who has to sign or
-              witness. They each sign in turn, when they can — nobody has to be
+              You are the first signatory. Add anyone else who has to sign.
+              They each sign in turn, when they can — nobody has to be
               available at the same time as anyone else, and they do not need a
               WiScribbles account.
             </p>
 
             {otherParties.map((party, index) => (
               <div className="row g-2 mb-2 align-items-start" key={index} style={{ maxWidth: 640 }}>
-                <div className="col-12 col-sm-4">
+                <div className="col-12 col-sm-5">
                   <input
                     className="form-control"
                     value={party.name}
@@ -622,7 +643,7 @@ export default function RequestWizard({ locale, prefill = null }) {
                     aria-label={`Party ${index + 2} name`}
                   />
                 </div>
-                <div className="col-12 col-sm-4">
+                <div className="col-12 col-sm-5">
                   <input
                     className="form-control"
                     type="email"
@@ -636,22 +657,7 @@ export default function RequestWizard({ locale, prefill = null }) {
                     aria-label={`Party ${index + 2} email`}
                   />
                 </div>
-                <div className="col-8 col-sm-3">
-                  <select
-                    className="form-select"
-                    value={party.role}
-                    onChange={(e) => {
-                      const next = [...otherParties];
-                      next[index] = { ...party, role: e.target.value };
-                      setOtherParties(next);
-                    }}
-                    aria-label={`Party ${index + 2} role`}
-                  >
-                    <option value="signatory">Signatory</option>
-                    <option value="witness">Witness</option>
-                  </select>
-                </div>
-                <div className="col-4 col-sm-1">
+                <div className="col-12 col-sm-2">
                   <button
                     type="button"
                     className="btn btn-link text-muted px-0"
@@ -678,28 +684,33 @@ export default function RequestWizard({ locale, prefill = null }) {
 
             {errors.parties && <div className="text-danger small mt-1">{errors.parties}</div>}
 
-            {/* A witness cannot attest over video in any of our jurisdictions.
-                Said here, at the moment the witness is added, rather than
-                discovered at signing time. */}
-            {witnessCount > 0 && (
-              <div
-                className="p-3 mt-3"
-                style={{
-                  ...STYLES.card,
-                  background: COLORS.warningBg,
-                  borderLeft: `4px solid ${COLORS.warning}`,
-                }}
+            {/* Standing, not reactive. The old version waited until a witness
+                had been added and then warned about it; this says the position
+                before the client has invested anything in a plan that cannot
+                work, and offers the route that does. */}
+            <div
+              className="p-3 mt-3"
+              style={{
+                ...STYLES.card,
+                background: COLORS.warningBg,
+                borderLeft: `4px solid ${COLORS.warning}`,
+              }}
+            >
+              <p className="mb-2" style={{ fontSize: '0.84rem', color: COLORS.warningText, lineHeight: 1.7 }}>
+                <strong>Does this document need a witness?</strong> Then it
+                cannot be signed here, and we would rather say so now than at
+                the end. A witness has to be present when you sign, and none of
+                the electronic transactions Acts in our jurisdictions turns
+                &ldquo;in the presence of&rdquo; into &ldquo;over video&rdquo;.
+                Everyone you add above is a signatory.
+              </p>
+              <a
+                style={{ fontSize: '0.84rem' }}
+                href={`/${locale}/prepare-register?jurisdiction=${encodeURIComponent(choice.jurisdiction ?? '')}`}
               >
-                <p className="mb-0" style={{ fontSize: '0.84rem', color: COLORS.warningText, lineHeight: 1.7 }}>
-                  <strong>A witness has to be physically present.</strong> None of
-                  the electronic transactions Acts in our jurisdictions turns
-                  &ldquo;in the presence of&rdquo; into &ldquo;over video&rdquo;, so a
-                  witness cannot attest online. Everyone else can still sign here;
-                  we will tell you how to arrange the witnessing. Witnesses are not
-                  charged while this is the case.
-                </p>
-              </div>
-            )}
+                Have it prepared here and signed on paper instead &rarr;
+              </a>
+            </div>
 
             {notarized && (
               <div className="mt-3" style={{ maxWidth: 200 }}>
@@ -751,7 +762,6 @@ export default function RequestWizard({ locale, prefill = null }) {
             {feeQuote && (
               <p className="mb-0 mt-3" style={{ fontSize: '0.86rem', color: COLORS.inkSubtle }}>
                 {signatoryCount} signator{signatoryCount === 1 ? 'y' : 'ies'}
-                {witnessCount > 0 && `, ${witnessCount} witness${witnessCount === 1 ? '' : 'es'}`}
                 {' — fee so far '}
                 <strong>{feeQuote.formattedTotal}</strong>, itemised on the next step.
               </p>

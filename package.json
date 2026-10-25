@@ -14,7 +14,8 @@
     "grant-admin": "node scripts/grant-admin.mjs",
     "backfill-name-lower": "node scripts/backfill-name-lower.mjs",
     "sweep-expired": "node scripts/sweep-expired.mjs",
-    "deploy-rules": "firebase deploy --only firestore:rules,firestore:indexes,storage"
+    "deploy-rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
+    "test": "node --test --import ./tests/register.mjs 'tests/**/*.test.mjs'"
   },
   "dependencies": {
     "@emailjs/browser": "^3.11.0",

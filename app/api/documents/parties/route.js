@@ -17,7 +17,6 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { authErrorResponse, requireApiUser } from '@/lib/auth/server';
 import {
-  PARTY_STATUS,
   SigningError,
   fullyExecuted,
   inviteNextParty,

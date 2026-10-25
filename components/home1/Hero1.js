@@ -95,7 +95,9 @@ const Hero1 = () => {
                     <i className="fas fa-angle-double-right" />
                   </a>
                 </Link>
-                <Link legacyBehavior href="/en/form-step1">
+                {/* And this one, which reintroduced the identical bug two lines
+                    below the comment describing it. */}
+                <Link legacyBehavior href={notarizeNow(locale)}>
                   <a className="theme-btn style-three" style={{ color: '#FFFFFF' }}>
                     {t("slider_btn_explore_services")}
                     <i className="fas fa-angle-double-right" />

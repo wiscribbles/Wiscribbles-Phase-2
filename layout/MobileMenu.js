@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { Accordion, ListGroup, ListGroupItem, Nav } from "react-bootstrap";
 import LangSwitcher from "@/components/LangSwitch";
+import { notarizeNow } from "@/lib/routes";
 import { usePathname } from "next/navigation";
 import { 
   Drawer, 
@@ -197,7 +198,7 @@ const MobileMenu = ({ logo }) => {
             <ListItem disablePadding>
               <ListItemButton 
                 component={Link} 
-                href="/en/form-step1" 
+                href={notarizeNow(locale)} 
                 onClick={() => setIsMenuOpen(false)}
                 sx={{
                   color: '#FFFFFF',
@@ -216,7 +217,7 @@ const MobileMenu = ({ logo }) => {
             <ListItem disablePadding>
               <ListItemButton 
                 component={Link} 
-                href="/en/form-step1" 
+                href={notarizeNow(locale)} 
                 onClick={() => setIsMenuOpen(false)}
                 sx={{
                   color: '#FFFFFF',

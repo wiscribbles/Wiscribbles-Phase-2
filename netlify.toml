@@ -1,0 +1,114 @@
+# Netlify configuration — WiScribbles Phase 2
+#
+# Next.js 14 App Router. The Netlify Next.js Runtime (v5) is detected
+# automatically from the `next` dependency and turns the App Router's server
+# components, route handlers and middleware into Netlify Functions. It does NOT
+# need to be listed as a plugin here; pinning it in `[[plugins]]` is the older
+# v4 pattern and causes a double-install warning on current builds.
+#
+# NO SECRET VALUE APPEARS IN THIS FILE, and none ever should — it is committed.
+# Every credential is set in the Netlify UI under
+#   Site configuration → Environment variables
+# and the full list, with which are secret and which are not, is in
+# docs/DEPLOY_CHECKLIST.md. The Phase 1 repository committed a Firebase Admin
+# service-account JSON to a public repo and that key had to be treated as
+# compromised; this file is where that mistake would be repeated, so it is
+# called out here rather than in a wiki nobody opens.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Pinned rather than left to drift. package.json requires >=18.18.0; 20 is
+  # the current Netlify LTS and is what the local build was verified against.
+  NODE_VERSION = "20"
+  # The build runs `next build`, which imports server modules. Without this,
+  # Netlify's default `npm ci` plus a lockfile mismatch fails opaquely.
+  NPM_FLAGS = "--no-audit --no-fund"
+
+# ---------------------------------------------------------------------------
+# Headers
+# ---------------------------------------------------------------------------
+#
+# This is a platform holding identity documents and executed instruments, so
+# the defaults are not good enough. Each header below is here for a stated
+# reason rather than copied from a checklist.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Clickjacking. The signing and session screens are the ones that matter:
+    # a framed signing page is how a party is tricked into signing something
+    # other than what they think they are looking at.
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+
+    X-Content-Type-Options = "nosniff"
+
+    # A signing link and a verification reference must not leak to third
+    # parties through the Referer header. `strict-origin-when-cross-origin` is
+    # the modern default but is worth stating, because the tokens in
+    # /sign/party/<token> are bearer credentials.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # The session view needs camera and microphone (ZegoCloud). Nothing else
+    # does, and nothing needs geolocation, USB or payment request APIs.
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), usb=(), payment=()"
+
+    # Two years, preload-eligible. Only safe once the custom domain is serving
+    # over HTTPS and you are content not to serve it over HTTP again.
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+
+# Uploaded and generated documents are served through signed URLs from
+# Firebase Storage, not from this origin, so there is no document path to
+# cache-control here. Next's own immutable asset headers are set by the
+# runtime.
+
+# ---------------------------------------------------------------------------
+# Redirects
+# ---------------------------------------------------------------------------
+#
+# DELIBERATELY EMPTY, with one exception below.
+#
+# `middleware.js` runs next-intl routing and the session-cookie guard for
+# /dashboard, /admin, /onboarding, /account, /notary and /video-call. A
+# Netlify-level redirect that rewrote a locale prefix would run BEFORE the
+# middleware and could route a request past that guard. Locale handling and
+# auth redirects stay in one place, in the middleware, where they are tested
+# and reviewable.
+
+# The one exception: the apex/www choice. Set this once the custom domain is
+# attached, and make it match NEXT_PUBLIC_BASE_URL exactly — email
+# verification links, signing links and the integrity record are all built
+# from that origin, so a document executed under one host and verified under
+# another is an avoidable support problem.
+#
+# [[redirects]]
+#   from = "https://www.wiscribbles.com/*"
+#   to = "https://wiscribbles.com/:splat"
+#   status = 301
+#   force = true
+
+# ---------------------------------------------------------------------------
+# Deploy contexts
+# ---------------------------------------------------------------------------
+
+[context.production]
+  command = "npm run build"
+
+# A deploy preview and a branch deploy get their own URL, so they MUST have
+# their own NEXT_PUBLIC_BASE_URL or they will mint verification and signing
+# links pointing at production. Set those per-context in the Netlify UI; they
+# cannot be set here without hardcoding a URL that changes per deploy.
+#
+# More importantly: point every non-production context at a SEPARATE Firebase
+# project. A preview deploy sharing the production project would write test
+# documents into the real `documents` collection — and executed documents are
+# never deleted, by design, so that mess would be permanent.
+
+[context.deploy-preview]
+  command = "npm run build"
+
+[context.branch-deploy]
+  command = "npm run build"

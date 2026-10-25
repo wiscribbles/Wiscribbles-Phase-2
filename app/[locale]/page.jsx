@@ -429,8 +429,15 @@ const IndexOnePage = ({ params }) => {
                           </li>
                         </ul>
                       </li>
+                      {/* Was `/${locale}/form-step1`. The Phase 1 form flow has
+                          NO jurisdiction gate and no exclusion-schedule check —
+                          its first screen offers Power of Attorney and Last Will,
+                          which are excluded from electronic execution in all four
+                          jurisdictions. Pointing the advertised entry point at it
+                          routed every client straight past the compliance engine.
+                          See docs/PHASE2_PLAN.md. */}
                       <li style={{padding: '0 10px'}}>
-                        <Link href={`/${locale}/form-step1`} style={{color: 'white', textDecoration: 'none', fontSize: '16px', fontWeight: '500'}}>
+                        <Link href={notarizeNow(locale)} style={{color: 'white', textDecoration: 'none', fontSize: '16px', fontWeight: '500'}}>
                           {t("navbar.standard")}
                         </Link>
                       </li>
@@ -674,7 +681,14 @@ const IndexOnePage = ({ params }) => {
               ].map((doc, index) => (
                 <div key={doc.id} className="col-lg-4 col-md-6 col-sm-6">
                   <div className="feature-item-five h-100 d-flex flex-column justify-content-center align-items-center">
-                    <Link legacyBehavior href={`/${locale}/form-step1?doc=${doc.id}`}>
+                    {/* Same reason as the navbar link above. The `?doc=` hint is
+                        dropped because the Phase 2 flow chooses jurisdiction and
+                        service BEFORE the document, so that an excluded type is
+                        refused with the statute named and offered Prepare &
+                        Register — which is exactly what six of these nine tiles
+                        need. The tiles themselves still advertise excluded
+                        documents; that is reported, not silently rewritten. */}
+                    <Link legacyBehavior href={notarizeNow(locale)}>
                       <a>
                         <img
                           className="mb-20"

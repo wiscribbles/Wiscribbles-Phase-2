@@ -20,7 +20,6 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { getSignedUrl } from '@/lib/storage/server';
 import {
-  PARTY_STATUS,
   SigningError,
   afterSigningComplete,
   declineToSign,

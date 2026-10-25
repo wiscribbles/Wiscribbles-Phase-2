@@ -82,10 +82,29 @@ service cloud.firestore {
        * escalation. The review and sanction trail is admin-owned evidence, and
        * the Stripe identifiers are set from verified webhooks, never asserted
        * by the browser.
+       *
+       * ADDED 25 OCT 2026 — `signUpAs`, `isStaff`, `staffRole`. These three
+       * were missing, and the omission was a live privilege-escalation path,
+       * not a tidiness point. `components/AdminGuard.jsx` authorised entry to
+       * the whole `/admin/*` tree on
+       *   user.role === 'admin' || user.signUpAs === 'Admin'
+       *   || user.isStaff === true || user.staffRole === 'operations'
+       * where `user` is this very document, spread into context by
+       * `context/AuthContext.jsx`. So any email-verified account could write
+       * `isStaff: true` to its own user doc and walk into the admin shell.
+       * Every actual READ behind that shell is gated on the custom claim
+       * (`requireApiAdmin`, and `isAdmin()` in these rules), so no data was
+       * exposed — but the separation rested entirely on nobody ever adding an
+       * admin surface that trusted the guard alone. The guard has since been
+       * replaced by a server-side `requireAdmin`; these three names are listed
+       * here as well because defence in depth is the whole point of this list,
+       * and because a field that can promote its own owner belongs on it
+       * regardless of who is currently reading it.
        */
       function protectedFields() {
         return [
           'role', 'status', 'requiresApproval',
+          'signUpAs', 'isStaff', 'staffRole',
           'adminFeedback', 'reviewedBy', 'reviewedAt', 'submittedForReviewAt',
           'suspendedUntil', 'sanctionHistory',
           'emailVerifiedAt', 'claimsUpdatedAt', 'lastSignInAt',

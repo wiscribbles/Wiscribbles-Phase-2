@@ -163,7 +163,12 @@ if (from === 'member' || from === 'notary') {
 2. **Notary Availability**: Show notary availability status
 3. **Multiple Notaries**: Support for multiple notaries in the system
 4. **Notification System**: Real-time notifications when client joins
-5. **Recording Option**: Option to record notarization session
+5. ~~**Recording Option**~~: *Removed 25 Oct 2026.* None of the four
+   e-transactions Acts requires a session recording — see
+   `RECORDING_REQUIRED_BY_STATUTE` in `lib/jurisdictions.js` for the analysis.
+   The statutory burden falls on the document's integrity and the KYC record,
+   not on a video file. Recording would become mandatory only in a
+   jurisdiction with a real RON statute.
 6. **Document Templates**: Pre-filled templates for common documents
 
 ## Support & Maintenance

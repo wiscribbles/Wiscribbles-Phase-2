@@ -3,11 +3,15 @@ import OxencyAccordion from "@/components/OxencyAccordion";
 import ProgressBar from "@/components/ProgressBar";
 import Layout from "@/layout/Layout";
 import PageBanner from "@/layout/PageBanner";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { notarizeNow } from "@/lib/routes";
 import Link from "next/link";
 
 const HowItWorks = ({ params: { form_id } }) => {
   const t = useTranslations();
+  /* Both "get started" CTAs on this page pointed at `/en/form-step1` — the
+     locale hard-coded, and the destination the ungated Phase 1 form flow. */
+  const locale = useLocale();
   return (
     <Layout footer={1} >
       <PageBanner
@@ -139,7 +143,7 @@ const HowItWorks = ({ params: { form_id } }) => {
                   <li>{t("how_it_works_benefit_fast")}</li>
                   <li>{t("how_it_works_benefit_legally_valid")}</li>
                 </ul>
-                <Link legacyBehavior href="/en/form-step1">
+                <Link legacyBehavior href={notarizeNow(locale)}>
                   <a className="theme-btn mt-15" style={{ color: '#FFFFFF' }}>
                     {t("how_it_works_get_started")} {" "}
                     <i className="fas fa-angle-double-right" />
@@ -290,7 +294,7 @@ const HowItWorks = ({ params: { form_id } }) => {
               </div>
             </div>
             <div className="col-lg-3 text-lg-end">
-              <Link legacyBehavior href="/en/form-step1">
+              <Link legacyBehavior href={notarizeNow(locale)}>
                 <a className="theme-btn style-two mb-30 wow fadeInUp delay-0-4s">
                   {t("how_it_works_lets_get_started")}{" "}
                   <i className="fas fa-angle-double-right" />
