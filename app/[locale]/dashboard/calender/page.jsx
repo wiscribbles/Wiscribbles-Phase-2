@@ -346,6 +346,10 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState(null)
   const [pendingMeetings, setPendingMeetings] = useState([])
+  /* The appointments query is a Phase 1 read that a client account is denied.
+     This is what lets the screen say so instead of showing an empty calendar
+     that looks like "you have no appointments". */
+  const [loadFailed, setLoadFailed] = useState(false)
   const router = useRouter()
   const signOut = useAuthStore((state) => state.signOut)
   const isNotary = userData?.signUpAs?.toLowerCase() === 'notary'
@@ -409,11 +413,11 @@ export default function CalendarPage() {
     fetchUserData()
   }, [])
 
-  useEffect(() => {
-    if (userData?.signUpAs?.toLowerCase() === 'notary') {
-      fetchPendingMeetings()
-    }
-  }, [userData?.signUpAs])
+  /* REMOVED: `fetchPendingMeetings`, the notification-bell query for every
+     pending `formSubmissions` document on the platform. Denied by
+     `firestore.rules`, threw an unhandled rejection on load, and asked for
+     other accounts' data. Same removal as the dashboard, profile and settings
+     screens. */
 
   const fetchUserData = async () => {
     const user = auth.currentUser
@@ -425,38 +429,54 @@ export default function CalendarPage() {
     }
   }
 
-  const fetchPendingMeetings = async () => {
-    const q = query(
-      collection(db, 'formSubmissions'),
-      where('status', '==', 'pending')
-    )
-    const querySnapshot = await getDocs(q)
-    const meetings = querySnapshot.docs.map(doc => doc.data())
-    setPendingMeetings(meetings)
-  }
-
+  /**
+   * The calendar's contents.
+   *
+   * STILL A PHASE 1 QUERY, AND IT WILL RETURN NOTHING FOR A CLIENT. It reads
+   * every pending `formSubmissions` document and filters client-side by
+   * `signUpAs`, which `firestore.rules` denies to a client account — and
+   * rightly: as written it asks for every other account's appointments.
+   *
+   * Left in place rather than removed, because unlike the notification bell
+   * this query IS the page, and an appointments screen belongs to the Phase 2
+   * migration rather than to a defensive patch. What has changed is that it no
+   * longer throws an unhandled rejection: a denied read now leaves the
+   * calendar empty and sets `loadFailed`, so the screen says it cannot show
+   * appointments instead of spinning on `loading` for ever.
+   */
   const fetchMeetings = async () => {
-    const q = query(collection(db, "formSubmissions"), where("status", "==", "pending"));
-    const querySnapshot = await getDocs(q);
-    const allowedTypes = ["attorney", "real estate agent", "business owner"];
-    const meetingsList = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        meetingId: data.meetingId,
-        title: `${data.step1?.firstName || ""} ${data.step1?.lastName || ""}`.trim() || "User Meeting",
-        time: data.meetingTime || '10:00 AM',
-        duration: '30 min',
-        attendees: [data.step1?.firstName || 'User'],
-        location: 'Virtual',
-        color: '#3b82f6',
-        date: data.meetingDate ? new Date(data.meetingDate) : new Date(),
-        status: data.status || 'pending',
-        signUpAs: data.step1?.signUpAs || '',
-      };
-    }).filter(meeting => allowedTypes.includes(meeting.signUpAs?.toLowerCase()));
-    setMeetings(meetingsList);
-    setLoading(false);
+    try {
+      const q = query(collection(db, "formSubmissions"), where("status", "==", "pending"));
+      const querySnapshot = await getDocs(q);
+      const allowedTypes = ["attorney", "real estate agent", "business owner"];
+      const meetingsList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          meetingId: data.meetingId,
+          title: `${data.step1?.firstName || ""} ${data.step1?.lastName || ""}`.trim() || "User Meeting",
+          time: data.meetingTime || '10:00 AM',
+          duration: '30 min',
+          attendees: [data.step1?.firstName || 'User'],
+          location: 'Virtual',
+          color: '#3b82f6',
+          date: data.meetingDate ? new Date(data.meetingDate) : new Date(),
+          status: data.status || 'pending',
+          signUpAs: data.step1?.signUpAs || '',
+        };
+      }).filter(meeting => allowedTypes.includes(meeting.signUpAs?.toLowerCase()));
+      setMeetings(meetingsList);
+      setLoadFailed(false);
+    } catch (error) {
+      /* A client account is denied this read, which is correct. Previously
+         this threw into nothing and `loading` never cleared, so the screen
+         sat on a spinner permanently. */
+      console.error('Could not load appointments', error);
+      setMeetings([]);
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const handleLogout = async () => {
@@ -679,6 +699,17 @@ export default function CalendarPage() {
               {loading ? (
                 <div style={styles.emptyState}>
                   <p>Loading meetings...</p>
+                </div>
+              ) : loadFailed ? (
+                /* An empty calendar and an unreadable one look identical, and
+                   telling someone they have no appointments when the truth is
+                   that nothing could be read is the worse of the two errors. */
+                <div style={styles.emptyState}>
+                  <p>Appointments can&apos;t be shown on this screen yet.</p>
+                  <p style={{ fontSize: '0.85rem', opacity: 0.75 }}>
+                    This is an older screen that has not been moved across yet.
+                    It is not a sign that anything is wrong with your account.
+                  </p>
                 </div>
               ) : getSelectedDateMeetings().length === 0 ? (
                 <div style={styles.emptyState}>

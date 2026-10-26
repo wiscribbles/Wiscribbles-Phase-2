@@ -24,6 +24,20 @@ const PDFViewer = dynamic(() => import('@/components/PDFViewer'), {
 
 const ROLE_LABEL = { signatory: 'Signatory', witness: 'Witness' };
 
+/**
+ * Refusals the party can put right on this page. Everything else means the
+ * link, the document or the sequence is finished, and the page says so.
+ * Mirrors the codes thrown by `assertReviewed` in `lib/review.js` plus the
+ * signing module's own `no_name`.
+ */
+const RECOVERABLE = new Set([
+  'review_required',
+  'document_not_reviewed',
+  'electronic_form_not_consented',
+  'corrected_after_review',
+  'no_name',
+]);
+
 const STATUS_TONE = {
   waiting: 'neutral',
   invited: 'info',
@@ -36,11 +50,26 @@ export default function PartySigning({ token, documentId }) {
   const [data, setData] = useState(null);
   const [failure, setFailure] = useState(null);
   const [signatureName, setSignatureName] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
   const [declining, setDeclining] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
+
+  /* Two stages, because of Barbados s.12A and Jamaica s.27(2): a party must be
+     able to review the whole transaction, correct it, and withdraw before they
+     are committed. 'sign' collects the name; 'review' shows what is about to
+     happen and is the only stage that can commit. The reasoning is in
+     `lib/review.js`. */
+  const [stage, setStage] = useState('sign');
+  const [reviewedAt, setReviewedAt] = useState(null);
+  const [documentReviewed, setDocumentReviewed] = useState(false);
+  const [electronicFormConsent, setElectronicFormConsent] = useState(false);
+
+  /* `failure` replaces the page — a dead link, nothing to do. `problem` is a
+     recoverable refusal shown beside the field that caused it. Routing a
+     "check your name and confirm again" message through `failure` would blank
+     the page on the one error the correction step exists to produce. */
+  const [problem, setProblem] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +99,7 @@ export default function PartySigning({ token, documentId }) {
 
   const act = async (payload) => {
     setBusy(true);
+    setProblem(null);
 
     try {
       const response = await fetch('/api/signing', {
@@ -80,6 +110,17 @@ export default function PartySigning({ token, documentId }) {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        /* Keyed on the error code, not the status. `corrected_after_review` is
+           a 409 the party can fix from this page; `already_signed`, `revoked`
+           and `out_of_turn` are 409s that are genuinely terminal, and telling
+           someone to check their name when the document has been revoked
+           would be a lie. */
+        if (RECOVERABLE.has(result.error)) {
+          setProblem(result.message ?? 'That did not go through.');
+          setStage('sign');
+          return;
+        }
+
         setFailure(result.message ?? 'That did not go through.');
         return;
       }
@@ -153,8 +194,16 @@ export default function PartySigning({ token, documentId }) {
 
   if (!data) return shell(<p style={{ color: COLORS.inkMuted }}>Loading…</p>);
 
-  const { document: doc, me, others, waitingFor, documentUrl } = data;
-  const ready = me.myTurn && signatureName.trim().length >= 2 && confirmed;
+  const { document: doc, me, others, waitingFor, documentUrl, review } = data;
+  const declaration = review?.declaration ?? {};
+  const nameReady = signatureName.trim().length >= 2;
+  const canCommit = me.myTurn && nameReady && documentReviewed && electronicFormConsent;
+
+  /* The signature as it will actually be stored, shown on the review stage.
+     Trimmed and whitespace-collapsed exactly as the server does it, so the
+     party reviews the string that gets recorded rather than the string they
+     happened to type. */
+  const nameAsRecorded = signatureName.trim().replace(/\s+/g, ' ');
 
   return shell(
     <>
@@ -240,14 +289,23 @@ export default function PartySigning({ token, documentId }) {
         </section>
       )}
 
-      {/* ---- sign ---- */}
-      {me.myTurn && !declining && (
+      {/* ---- stage 1: the name ---------------------------------------------
+          Nothing here commits anything. The only button that commits is on the
+          review stage below, which is the point of splitting them. */}
+      {me.myTurn && !declining && stage === 'sign' && (
         <section className="p-4" style={STYLES.card}>
           <h2 style={STYLES.sectionHeading}>Sign</h2>
           <p style={{ ...STYLES.lede, fontSize: '0.88rem' }}>
             Type your full name. That typed name is your electronic signature,
-            and it has the same effect as signing on paper.
+            and it has the same effect as signing on paper. You will get a
+            chance to check everything before it is final.
           </p>
+
+          {problem && (
+            <div className="alert alert-warning py-2" role="alert" style={{ fontSize: '0.88rem' }}>
+              {problem}
+            </div>
+          )}
 
           <div className="mb-3">
             <label className="form-label" htmlFor="sig-name" style={{ fontWeight: 500 }}>
@@ -263,29 +321,22 @@ export default function PartySigning({ token, documentId }) {
             />
           </div>
 
-          <div className="form-check mb-3">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="sig-confirm"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            <label className="form-check-label" htmlFor="sig-confirm">
-              I have read this document and I intend my typed name to be my
-              signature on it.
-            </label>
-          </div>
-
           <div className="d-flex gap-2 flex-wrap">
             <button
               type="button"
               className="btn"
-              disabled={!ready || busy}
-              onClick={() => act({ signatureName })}
+              disabled={!nameReady || busy}
+              onClick={() => {
+                /* The moment the party was shown the review. Recorded as
+                   *claimed* — the server keeps its own timestamp too, and
+                   `lib/review.js` says why both are kept. */
+                setReviewedAt(new Date().toISOString());
+                setProblem(null);
+                setStage('review');
+              }}
               style={STYLES.buttonPositive}
             >
-              {busy ? 'Signing…' : 'Sign this document'}
+              Review before signing
             </button>
             <button
               type="button"
@@ -295,6 +346,151 @@ export default function PartySigning({ token, documentId }) {
               I do not want to sign
             </button>
           </div>
+        </section>
+      )}
+
+      {/* ---- stage 2: review, correct, or withdraw --------------------------
+          Barbados ETA s.12A and Jamaica ETA s.27(2). A party must be able to
+          review the whole transaction, correct errors in it and withdraw
+          before being committed; in Barbados a material error made with no
+          opportunity to correct it leaves the transaction with no legal
+          effect. So this stage exists to be refusable, and the server will not
+          accept a signature without the acknowledgement it produces. */}
+      {me.myTurn && !declining && stage === 'review' && (
+        <section className="p-4" style={{ ...STYLES.card, borderLeft: `4px solid ${COLORS.brand}` }}>
+          <h2 style={STYLES.sectionHeading}>Check this before you sign</h2>
+          <p style={{ ...STYLES.lede, fontSize: '0.88rem' }}>
+            {declaration.correctionNotice ??
+              'If anything here is wrong, go back and correct it before you sign.'}
+          </p>
+
+          {problem && (
+            <div className="alert alert-warning py-2" role="alert" style={{ fontSize: '0.88rem' }}>
+              {problem}
+            </div>
+          )}
+
+          <dl className="mb-3" style={{ fontSize: '0.9rem' }}>
+            {[
+              ['Document', doc.name],
+              ['Type', doc.templateName],
+              ['Where it takes effect', doc.jurisdiction],
+              ['You are signing as', ROLE_LABEL[me.role] ?? me.role],
+              ['Sent by', doc.ownerName],
+            ]
+              .filter(([, value]) => Boolean(value))
+              .map(([label, value]) => (
+                <div
+                  key={label}
+                  className="d-flex justify-content-between gap-3 py-2"
+                  style={{ borderBottom: `1px solid ${COLORS.border}` }}
+                >
+                  <dt style={{ color: COLORS.inkMuted, fontWeight: 400 }}>{label}</dt>
+                  <dd className="mb-0 text-end" style={{ color: COLORS.ink }}>
+                    {value}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+
+          {/* The string that will actually be stored, not the string typed —
+              trimmed and whitespace-collapsed the same way the server does it.
+              Reviewing a value that differs from the one recorded would make
+              the artefact a record of a review that did not happen. */}
+          <div
+            className="p-3 mb-3"
+            style={{ background: COLORS.surface, borderRadius: RADIUS.md }}
+          >
+            <p className="mb-1" style={{ fontSize: '0.82rem', color: COLORS.inkMuted }}>
+              Your signature will be recorded as
+            </p>
+            <p
+              className="mb-0"
+              style={{ fontFamily: 'Jost, sans-serif', fontSize: '1.15rem', color: COLORS.ink }}
+            >
+              {nameAsRecorded}
+            </p>
+          </div>
+
+          <div className="form-check mb-2">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="rev-document"
+              checked={documentReviewed}
+              onChange={(e) => setDocumentReviewed(e.target.checked)}
+            />
+            <label className="form-check-label" htmlFor="rev-document">
+              {declaration.documentReviewed ??
+                'I have read the document above and the details shown here, and they are correct.'}
+            </label>
+          </div>
+
+          {/* Consent to electronic form, per document and per party. Guyana
+              ECT s.5(1)(a), Barbados s.3(2)–(3): nobody is *required* to
+              accept an electronic signature, so consent is an element of
+              validity and the account-level terms acceptance is the wrong
+              artefact for it. */}
+          <div className="form-check mb-3">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="rev-eform"
+              checked={electronicFormConsent}
+              onChange={(e) => setElectronicFormConsent(e.target.checked)}
+            />
+            <label className="form-check-label" htmlFor="rev-eform">
+              {declaration.electronicForm ??
+                'I agree that this document may be signed and kept in electronic form, and that my typed name is my signature on it.'}
+            </label>
+          </div>
+
+          <div className="d-flex gap-2 flex-wrap">
+            <button
+              type="button"
+              className="btn"
+              disabled={!canCommit || busy}
+              onClick={() =>
+                act({
+                  signatureName: nameAsRecorded,
+                  review: {
+                    documentReviewed,
+                    electronicFormConsent,
+                    signatureName: nameAsRecorded,
+                    reviewedAt,
+                  },
+                })
+              }
+              style={STYLES.buttonPositive}
+            >
+              {busy ? 'Signing…' : 'Confirm and sign'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              disabled={busy}
+              onClick={() => {
+                setStage('sign');
+                setProblem(null);
+              }}
+            >
+              Correct something
+            </button>
+            <button
+              type="button"
+              className="btn btn-link text-muted"
+              onClick={() => setDeclining(true)}
+            >
+              I do not want to sign
+            </button>
+          </div>
+
+          {review?.basis?.inForce && (
+            <p className="mb-0 mt-3" style={{ fontSize: '0.8rem', color: COLORS.inkMuted }}>
+              You have a right to check this and put it right before it becomes
+              final, and to walk away instead. That is what this step is for.
+            </p>
+          )}
         </section>
       )}
 

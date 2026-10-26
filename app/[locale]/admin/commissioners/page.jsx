@@ -38,12 +38,28 @@ const CommissionersAdminPage = () => {
   }, []);
 
   const handleDecision = async (userId, status) => {
+    /* A rejection must carry a reason — the applicant is shown it, and the
+       server refuses the decision without one. See the same note on the users
+       page: the full review surface is `/admin/partners`. */
+    let notes = '';
+
+    if (status === 'rejected') {
+      notes = window.prompt('Reason for rejection (the applicant is shown this)') ?? '';
+      if (!notes.trim()) {
+        toast.error('No reason given — nothing was changed.');
+        return;
+      }
+    }
+
     try {
-      await updateUserStatus(userId, { status });
+      await updateUserStatus(userId, { status, notes });
       toast.success(`Application ${status}`);
       await loadData();
     } catch (error) {
       console.error('Failed to update status', error);
+      /* Previously swallowed entirely: the write failed against the security
+         rules and the manager saw nothing at all. */
+      toast.error(error?.message ?? 'Unable to record that decision.');
     }
   };
 

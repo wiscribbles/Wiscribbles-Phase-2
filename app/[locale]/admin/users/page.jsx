@@ -131,14 +131,40 @@ const UsersAdminPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStatus, selectedRole]);
 
+  /* Rejecting an application, or sending it back for more information,
+     requires a reason: the applicant is shown it, and an outright refusal with
+     no explanation leaves them with nothing to act on. The server enforces
+     this too — `decidePartnerApplication` refuses both decisions without
+     feedback — so this is here to ask for it rather than to be the only
+     guard.
+
+     A prompt is a deliberately plain way to collect it. The full review
+     screen with a proper feedback field is `/admin/partners`; this page is a
+     Phase 1 surface kept working until it is retired, and giving it its own
+     parallel decision UI is how the two drift apart. */
+  const REASON_REQUIRED = { rejected: 'Reason for rejection', pending_review: 'What further information is needed?' };
+
   const handleUpdateStatus = async (userId, nextStatus, note = '') => {
+    let reason = note;
+
+    if (REASON_REQUIRED[nextStatus] && !reason.trim()) {
+      reason = window.prompt(`${REASON_REQUIRED[nextStatus]} (the applicant is shown this)`) ?? '';
+      if (!reason.trim()) {
+        toast.error('No reason given — nothing was changed.');
+        return;
+      }
+    }
+
     try {
-      await updateUserStatus(userId, { status: nextStatus, notes: note });
+      await updateUserStatus(userId, { status: nextStatus, notes: reason });
       toast.success(`User status updated to ${nextStatus}`);
       await loadUsers();
     } catch (error) {
       console.error('Failed to update user status:', error);
-      toast.error('Unable to update status. Please try again.');
+      /* The server's own message. These refusals are written to tell the
+         reviewer what to do — "You cannot decide on your own account" is
+         actionable; "Please try again" sends them round the same loop. */
+      toast.error(error?.message ?? 'Unable to update status. Please try again.');
     }
   };
 

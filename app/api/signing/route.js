@@ -29,6 +29,7 @@ import {
   tokensMatch,
 } from '@/lib/signing';
 import { getJurisdiction } from '@/lib/jurisdictions';
+import { REVIEW_DECLARATION, ReviewError, describeReviewBasis } from '@/lib/review';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -124,6 +125,14 @@ export async function GET(request) {
     waitingFor:
       !myTurn && turn ? { order: turn.order, name: turn.name } : null,
     documentUrl,
+    /* The declaration wording is served from here rather than written into
+       the component, so the words a party is shown and the words recorded
+       against their signature are the same string from the same place. A
+       second copy in the browser is a second copy to drift. */
+    review: {
+      declaration: REVIEW_DECLARATION,
+      basis: describeReviewBasis(data.jurisdiction),
+    },
   });
 }
 
@@ -170,6 +179,7 @@ export async function POST(request) {
       token,
       signatureName: body?.signatureName,
       ip: callerIp(request),
+      review: body?.review ?? null,
     });
 
     await adminDb()
@@ -196,7 +206,14 @@ export async function POST(request) {
       enqueued: after.enqueued,
     });
   } catch (error) {
-    if (error instanceof SigningError) return signingError(error);
+    /* `ReviewError` carries the same code/message/status/field shape as
+       `SigningError`, so it renders through the same formatter. It is a
+       separate class because the review gate is a separate duty with its own
+       statutory source, and conflating the two would make `lib/review.js`
+       depend on the signing module it is called from. */
+    if (error instanceof SigningError || error instanceof ReviewError) {
+      return signingError(error);
+    }
     throw error;
   }
 }

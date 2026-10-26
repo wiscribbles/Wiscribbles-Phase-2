@@ -9,8 +9,9 @@ import { Poppins } from 'next/font/google';
 import NotificationBell from '@/components/NotificationBell';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { query, collection, getDocs, where } from 'firebase/firestore';
-import { db } from '@/firebase';
+/* The `firebase/firestore` query imports went with the notification-bell
+   query removed below; nothing on this screen reads Firestore directly any
+   more. */
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -36,20 +37,15 @@ export default function Profile() {
     fetchUserData();
   }, []);
 
-  useEffect(() => {
-    if (userData?.signUpAs?.toLowerCase() === 'notary') {
-      const fetchPendingMeetings = async () => {
-        const q = query(
-          collection(db, 'formSubmissions'),
-          where('status', '==', 'pending')
-        );
-        const querySnapshot = await getDocs(q);
-        const meetings = querySnapshot.docs.map(doc => doc.data());
-        setPendingMeetings(meetings);
-      };
-      fetchPendingMeetings();
-    }
-  }, [userData?.signUpAs]);
+  /* REMOVED: a query for every pending `formSubmissions` document on the
+     platform, used to feed the notification bell.
+
+     It was denied by `firestore.rules` and threw an unhandled rejection on
+     page load. It was also the wrong query to be making: it asked for every
+     client's pending submission regardless of who was looking, which is
+     precisely why the rule denies it. The bell is fed nothing until there is
+     a per-account notification source to feed it from. The same query was
+     removed from the dashboard landing page and the settings screen. */
 
   return (
     <div className={`d-flex ${poppins.className}`} style={{ minHeight: "100vh", backgroundColor: "#ffffff" }}>

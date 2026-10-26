@@ -345,6 +345,22 @@ const invitedParty = (order, token, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * A well-formed review acknowledgement for a given name.
+ *
+ * Since 26 Oct 2026 `recordSignature` refuses a signature that does not carry
+ * one — Barbados ETA s.12A, Jamaica ETA s.27(2). The helper exists so that the
+ * tests below are about signing order and tokens, as they were, rather than
+ * about the review payload; the gate itself is tested in `review.test.mjs` and
+ * at the bottom of this file.
+ */
+const reviewedAs = (signatureName) => ({
+  documentReviewed: true,
+  electronicFormConsent: true,
+  signatureName,
+  reviewedAt: new Date().toISOString(),
+});
+
 test('a party signing in turn is recorded', async () => {
   const token = 'token-one';
   const db = createFirestore(documentWith([invitedParty(1, token)]));
@@ -354,12 +370,85 @@ test('a party signing in turn is recorded', async () => {
     documentId: 'doc1',
     token,
     signatureName: 'Party One',
+    review: reviewedAs('Party One'),
   });
 
   assert.equal(outcome.complete, true, 'the only party has signed');
   const stored = db.__store.documents.doc1.parties[0];
   assert.equal(stored.status, PARTY_STATUS.SIGNED);
   assert.ok(stored.signedAt);
+
+  /* The review artefact is stored on the party, and is the evidence that the
+     opportunity to correct was given. Without it the signature is voidable in
+     Barbados and the fact cannot be reconstructed later. */
+  assert.ok(stored.review, 'the review artefact is recorded against the party');
+  assert.equal(stored.review.documentReviewed, true);
+  assert.equal(stored.review.electronicFormConsent, true);
+  assert.ok(stored.review.confirmedAt, 'the server records its own timestamp');
+  assert.ok(
+    stored.review.declarations.electronicForm.length > 20,
+    'the declaration is stored verbatim, not as a version reference',
+  );
+});
+
+test('a signature with no review acknowledgement is refused', async () => {
+  const token = 'token-one';
+  __setFirestore(createFirestore(documentWith([invitedParty(1, token)])));
+
+  await assert.rejects(
+    () => recordSignature({ documentId: 'doc1', token, signatureName: 'Party One' }),
+    (error) => {
+      assert.equal(error.code, 'review_required');
+      assert.equal(error.status, 422);
+      return true;
+    },
+  );
+});
+
+test('a name edited after it was reviewed is refused, not silently signed', async () => {
+  const token = 'token-one';
+  const db = createFirestore(documentWith([invitedParty(1, token)]));
+  __setFirestore(db);
+
+  await assert.rejects(
+    () =>
+      recordSignature({
+        documentId: 'doc1',
+        token,
+        signatureName: 'Someone Else Entirely',
+        review: reviewedAs('Party One'),
+      }),
+    (error) => {
+      assert.equal(error.code, 'corrected_after_review');
+      assert.equal(error.status, 409);
+      return true;
+    },
+  );
+
+  assert.equal(
+    db.__store.documents.doc1.parties[0].status,
+    PARTY_STATUS.INVITED,
+    'nothing was written — the party is still unsigned',
+  );
+});
+
+test('an unticked electronic-form consent refuses the signature', async () => {
+  const token = 'token-one';
+  __setFirestore(createFirestore(documentWith([invitedParty(1, token)])));
+
+  await assert.rejects(
+    () =>
+      recordSignature({
+        documentId: 'doc1',
+        token,
+        signatureName: 'Party One',
+        review: { ...reviewedAs('Party One'), electronicFormConsent: false },
+      }),
+    (error) => {
+      assert.equal(error.code, 'electronic_form_not_consented');
+      return true;
+    },
+  );
 });
 
 test('signing out of turn is refused and tells the party to wait', async () => {

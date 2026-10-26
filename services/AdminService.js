@@ -1,6 +1,18 @@
 'use client';
 
-import { db, auth } from '@/firebase';
+/**
+ * Admin data access.
+ *
+ * READS are still direct Firestore queries: `firestore.rules` allows an admin
+ * to read these collections, and a listing carries no decision.
+ *
+ * WRITES all go through server routes. They used to be client writes against
+ * collections the rules deny, which meant every one of them failed and the
+ * pages showed a button that did nothing. The write side of this file is now
+ * a thin client over `/api/admin/*`.
+ */
+
+import { db } from '@/firebase';
 import {
   collection,
   query,
@@ -8,18 +20,12 @@ import {
   orderBy,
   limit as firestoreLimit,
   getDocs,
-  doc,
-  updateDoc,
-  addDoc,
-  getDoc,
-  setDoc,
 } from 'firebase/firestore';
 
 const USERS_COLLECTION = 'users';
 const SUBMISSIONS_COLLECTION = 'formSubmissions';
 const PAYMENTS_COLLECTION = 'paymentTransactions';
 const COMMISSIONER_APPLICATIONS_COLLECTION = 'commissionerApplications';
-const ADMIN_SETTINGS_DOC = 'adminSettings/global';
 
 const buildQueryWithFilters = (baseCollection, filters = [], sort = null, limitValue = null) => {
   const clauses = [collection(db, baseCollection)];
@@ -87,29 +93,95 @@ export const fetchUsers = async ({
   return limitValue ? users.slice(0, limitValue) : users;
 };
 
-export const updateUserStatus = async (userId, { status, reviewerId, notes = '' }) => {
+/**
+ * Call a server route and surface the server's own message.
+ *
+ * Every write in this file used to go straight from the browser to Firestore,
+ * against collections `firestore.rules` denies. They failed, the pages logged
+ * the error, and the Website Manager saw buttons that did nothing. They go
+ * through routes now; this is the one place that knows how a route reports a
+ * refusal, so each caller does not reinvent it.
+ */
+const callRoute = async (url, { method = 'POST', body = null } = {}) => {
+  const response = await fetch(url, {
+    method,
+    cache: 'no-store',
+    ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    /* The server's message, not a generic one. These refusals are written to
+       be read by the person who hit them — "Give a reason for the rejection"
+       tells them what to do; "Request failed" does not. */
+    const error = new Error(payload.message ?? `That did not go through (${response.status}).`);
+    error.code = payload.error ?? 'request_failed';
+    error.field = payload.field ?? null;
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload;
+};
+
+/**
+ * Phase 1 status strings → Phase 2 decisions.
+ *
+ * WHY THIS MAPS RATHER THAN WRITES. There is already one correct path to a
+ * changed account status — `decidePartnerApplication`, behind
+ * `/api/admin/partners` — and it does two things this file never did: it
+ * validates that the account is actually a partner application, and it syncs
+ * the custom claims that the security rules and every server guard read. The
+ * old code here wrote `status` directly and left the claims alone, so an
+ * account could read "approved" while still being locked out of everything.
+ * A second path that happened to do the same things would drift from the
+ * first the moment either changed, so there is only one.
+ *
+ * `active` is the Phase 1 name for what Phase 2 calls `approved`; it maps to
+ * `reinstate` because that is the decision that returns an account to good
+ * standing. `pending_review` maps to `request_info`, which is the only
+ * decision that reopens an application for the applicant to amend.
+ */
+const DECISION_FOR_STATUS = Object.freeze({
+  approved: 'approve',
+  active: 'reinstate',
+  rejected: 'reject',
+  pending_review: 'request_info',
+  suspended: 'suspend',
+});
+
+/** Decisions the reviewer must give a reason for, enforced server-side too. */
+const NEEDS_REASON = new Set(['reject', 'request_info']);
+
+export const updateUserStatus = async (userId, { status, notes = '' } = {}) => {
   if (!userId || !status) {
     throw new Error('User ID and status are required to update user status');
   }
 
-  const now = new Date().toISOString();
+  const decision = DECISION_FOR_STATUS[status];
 
-  const updates = {
-    status,
-    reviewerId: reviewerId ?? auth.currentUser?.uid ?? null,
-    reviewNotes: notes,
-    updatedAt: now,
-  };
-
-  if (status === 'approved') {
-    updates.approvedAt = now;
-    updates.rejectedAt = null;
-  } else if (status === 'rejected') {
-    updates.rejectedAt = now;
-    updates.approvedAt = null;
+  if (!decision) {
+    throw new Error(
+      `"${status}" is not a status that can be set from here. Use the partner ` +
+        'review screen for anything else.',
+    );
   }
 
-  await updateDoc(doc(db, USERS_COLLECTION, userId), updates);
+  if (NEEDS_REASON.has(decision) && !String(notes).trim()) {
+    /* Checked here as well as on the server so the page can prompt for the
+       reason before spending a round trip on a refusal it can predict. */
+    throw new Error(
+      decision === 'reject'
+        ? 'Give a reason for the rejection — the applicant is shown it.'
+        : 'Say what further information is needed.',
+    );
+  }
+
+  return callRoute('/api/admin/partners', {
+    method: 'PATCH',
+    body: { uid: userId, decision, feedback: String(notes).trim() || null },
+  });
 };
 
 export const fetchNotarizationSubmissions = async ({
@@ -155,14 +227,18 @@ export const fetchNotarizationSubmissions = async ({
   return limitValue ? submissions.slice(0, limitValue) : submissions;
 };
 
-export const updateNotarizationStatus = async (submissionId, updates = {}) => {
+export const updateNotarizationStatus = async (submissionId, { status } = {}) => {
   if (!submissionId) {
     throw new Error('Submission ID is required to update notarization status');
   }
 
-  await updateDoc(doc(db, SUBMISSIONS_COLLECTION, submissionId), {
-    ...updates,
-    lastUpdatedAt: new Date().toISOString(),
+  /* Only the status. The old signature took an arbitrary `updates` object and
+     spread it into the document, which on a route running with Admin
+     credentials would write whatever keys arrived. `workflowStage` is set
+     server-side alongside `status` so the two cannot drift. */
+  return callRoute('/api/admin/notarizations', {
+    method: 'PATCH',
+    body: { submissionId, status },
   });
 };
 
@@ -203,15 +279,11 @@ export const fetchCommissionerApplications = async ({
   return limitValue ? applications.slice(0, limitValue) : applications;
 };
 
-export const recordCommissionerApplication = async (payload) => {
-  const collectionRef = collection(db, COMMISSIONER_APPLICATIONS_COLLECTION);
-  await addDoc(collectionRef, {
-    ...payload,
-    status: payload.status ?? 'pending_review',
-    submittedAt: payload.submittedAt ?? new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-};
+/* `recordCommissionerApplication` was here and has been removed. Nothing in
+   the codebase called it, it wrote to a collection the rules deny, and a
+   Commissioner of Oaths application is created through the partner onboarding
+   flow. Building a server route for a function with no caller would have been
+   building a second, untested way to create an application. */
 
 export const fetchPaymentTransactions = async ({
   recipientRole,
@@ -255,28 +327,48 @@ export const fetchPaymentTransactions = async ({
   return limitValue ? transactions.slice(0, limitValue) : transactions;
 };
 
-export const recordPaymentTransaction = async (transaction) => {
-  const collectionRef = collection(db, PAYMENTS_COLLECTION);
-  await addDoc(collectionRef, {
-    ...transaction,
-    status: transaction.status ?? 'scheduled',
-    createdAt: transaction.createdAt ?? new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    processedAt: transaction.processedAt ?? null,
-  });
+/**
+ * PAYOUTS ARE NOT WIRED UP, AND THESE TWO REFUSE RATHER THAN PRETEND.
+ *
+ * Both used to write to `paymentTransactions` from the browser, against a
+ * rule that denies it, so they already did nothing. They are not being given
+ * server routes, and that is a decision rather than an omission:
+ *
+ *   - Payment collection is switched off pending the money-transmission
+ *     question, so there is nothing to pay out of.
+ *   - The answer to that question looks likely to be that the platform must
+ *     never hold client funds at all — routing settlement through a licensed
+ *     provider of record that pays the professional directly. That removes a
+ *     licensing precondition in all four jurisdictions and an AML
+ *     registration in two. If it is the route taken, a payout ledger owned by
+ *     the platform is not the thing to build; a reconciliation view over the
+ *     provider's records is.
+ *   - Three of the four jurisdictions cap or fix notarial fees, and two
+ *     prohibit paying anyone for procuring a retainer, so how money moves
+ *     here is a question with a legal answer that nobody has yet.
+ *
+ * A clear refusal is therefore the correct behaviour, and it is strictly
+ * better than the silent failure it replaces: the Website Manager now learns
+ * why the button does nothing instead of wondering whether the click
+ * registered.
+ */
+const PAYOUTS_OFF =
+  'Payouts are not switched on yet. Payment collection is parked pending the ' +
+  'money-transmission question, and how settlement works — most likely ' +
+  'directly from a licensed provider to the professional, never through ' +
+  'WiScribbles — has to be decided before a payout record means anything. ' +
+  'Nothing was saved.';
+
+export const recordPaymentTransaction = async () => {
+  const error = new Error(PAYOUTS_OFF);
+  error.code = 'payouts_disabled';
+  throw error;
 };
 
-export const markPaymentAsProcessed = async (transactionId, updates = {}) => {
-  if (!transactionId) {
-    throw new Error('Transaction ID is required to update payment');
-  }
-
-  await updateDoc(doc(db, PAYMENTS_COLLECTION, transactionId), {
-    ...updates,
-    status: updates.status ?? 'completed',
-    processedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+export const markPaymentAsProcessed = async () => {
+  const error = new Error(PAYOUTS_OFF);
+  error.code = 'payouts_disabled';
+  throw error;
 };
 
 export const fetchAdminDashboardMetrics = async () => {
@@ -302,32 +394,30 @@ export const fetchAdminDashboardMetrics = async () => {
   };
 };
 
+/**
+ * Read and write go through the route: `adminSettings` is denied to clients
+ * for both, and the defaults now live server-side in `lib/settings.js` so the
+ * page and the server cannot disagree about what an unset value means.
+ *
+ * The response carries `noConsumerYet`, which the page displays. Nothing in
+ * the product reads these settings — the write failing used to hide that;
+ * fixing the write exposes it.
+ */
 export const fetchAdminSettings = async () => {
-  const settingsRef = doc(db, ADMIN_SETTINGS_DOC);
-  const snapshot = await getDoc(settingsRef);
-  if (snapshot.exists()) {
-    return snapshot.data();
-  }
+  const payload = await callRoute('/api/admin/settings', { method: 'GET' });
   return {
-    autoAssignNotaries: false,
-    autoApproveAttorneys: false,
-    notifyOnLargePayments: true,
-    largePaymentThreshold: 1000,
-    defaultPayoutCurrency: 'USD',
+    ...payload.settings,
+    __currencies: payload.currencies,
+    __noConsumerYet: payload.noConsumerYet === true,
   };
 };
 
 export const updateAdminSettings = async (settings) => {
-  const settingsRef = doc(db, ADMIN_SETTINGS_DOC);
-  await setDoc(
-    settingsRef,
-    {
-      ...settings,
-      updatedAt: new Date().toISOString(),
-      updatedBy: auth.currentUser?.uid ?? null,
-    },
-    { merge: true },
-  );
+  const payload = await callRoute('/api/admin/settings', {
+    method: 'PUT',
+    body: { settings },
+  });
+  return payload.settings;
 };
 
 export default {
@@ -336,7 +426,6 @@ export default {
   fetchNotarizationSubmissions,
   updateNotarizationStatus,
   fetchCommissionerApplications,
-  recordCommissionerApplication,
   fetchPaymentTransactions,
   recordPaymentTransaction,
   markPaymentAsProcessed,

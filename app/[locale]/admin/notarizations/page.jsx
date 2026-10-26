@@ -40,6 +40,9 @@ const NotarizationsAdminPage = () => {
   const [submissions, setSubmissions] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);
+  /* A failed status change used to be logged to the console and nowhere else.
+     This page has no toast provider, so the message is rendered. */
+  const [actionError, setActionError] = useState(null);
 
   const loadSubmissions = async () => {
     try {
@@ -63,11 +66,21 @@ const NotarizationsAdminPage = () => {
   }, [selectedStatus]);
 
   const handleStatusChange = async (submissionId, nextStatus) => {
+    setActionError(null);
+
     try {
-      await updateNotarizationStatus(submissionId, { status: nextStatus, workflowStage: nextStatus });
+      /* `workflowStage` is no longer sent: the server sets it alongside
+         `status` so the two cannot disagree, and the route accepts only the
+         status rather than spreading whatever the browser sends into the
+         document. */
+      await updateNotarizationStatus(submissionId, { status: nextStatus });
       await loadSubmissions();
     } catch (error) {
       console.error('Failed to update notarization', error);
+      /* Shown, not just logged. This write was failing silently against the
+         security rules, so the manager pressed a button and nothing happened
+         with no indication why. */
+      setActionError(error?.message ?? 'That status change did not go through.');
     }
   };
 
@@ -78,6 +91,18 @@ const NotarizationsAdminPage = () => {
 
   return (
     <div className="d-flex flex-column gap-4">
+      {actionError && (
+        <div className="alert alert-warning mb-0 d-flex justify-content-between align-items-start gap-3" role="alert">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className="btn-close"
+            aria-label="Dismiss"
+            onClick={() => setActionError(null)}
+          />
+        </div>
+      )}
+
       <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
         <div>
           <h2 className="fw-semibold mb-1 d-flex align-items-center gap-2">

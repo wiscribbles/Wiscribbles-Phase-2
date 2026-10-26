@@ -37,11 +37,15 @@ const AdminSettingsPage = () => {
     event.preventDefault();
     try {
       setSaving(true);
-      await updateAdminSettings(settings);
-      toast.success('Settings updated successfully');
+      const saved = await updateAdminSettings(settings);
+      setSettings((prev) => ({ ...prev, ...saved }));
+      toast.success('Settings saved');
     } catch (error) {
       console.error('Failed to update settings', error);
-      toast.error('Unable to save settings');
+      /* The server's message. One of these refusals explains why attorneys
+         cannot be approved automatically, which is worth reading rather than
+         replacing with "unable to save". */
+      toast.error(error?.message ?? 'Unable to save settings');
     } finally {
       setSaving(false);
     }
@@ -65,6 +69,24 @@ const AdminSettingsPage = () => {
           Configure automation for assignments, approvals, and payout monitoring to keep the back office running smoothly.
         </p>
       </div>
+
+      {/* Said plainly rather than implied. These settings now save — they were
+          failing against the security rules before — but nothing in the
+          product reads them yet, so saving one records an intention and not an
+          effect. Whoever wires a consumer should delete this notice in the
+          same commit. The flag comes from the server so the two cannot
+          disagree about it. */}
+      {settings.__noConsumerYet && (
+        <div className="alert alert-info mb-0" role="note">
+          <strong>These settings are recorded but not yet acted on.</strong> They
+          save correctly, and the values are kept with an audit entry — but no
+          part of the platform reads them at the moment, so changing one does
+          not change how assignments, approvals or payout alerts behave.
+          Automatic approval of attorneys and notaries is refused outright: approval
+          is where a professional is checked against the register, and in Guyana
+          performing notarial acts for reward while off that register is an offence.
+        </div>
+      )}
 
       {loading && (
         <div className="d-flex align-items-center gap-2 text-muted">

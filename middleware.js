@@ -28,10 +28,14 @@ const PROTECTED_PREFIXES = [
   '/admin',
   '/onboarding',
   '/account',
-  '/notary',
-  '/notary-dashboard',
-  '/secondary-dashboard',
   '/video-call',
+  /* `/notary`, `/notary-dashboard` and `/secondary-dashboard` were here and
+     have gone with the routes themselves (26 Oct 2026). All three were Phase 1
+     pages whose entire contents, `export default` included, were commented
+     out: they registered in the route manifest and would have errored for
+     anyone who reached them. Guarding a route that does not exist costs
+     nothing but reads as though the page is live, which is how a dead route
+     survives a cleanup. */
 ];
 
 /** Signed-in users have no business on these. */

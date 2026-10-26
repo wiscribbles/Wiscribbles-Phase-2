@@ -90,6 +90,10 @@ const PaymentsAdminPage = () => {
       await loadTransactions();
     } catch (error) {
       console.error('Failed to create payment', error);
+      /* Payouts are deliberately not wired up — see the note in
+         `services/AdminService.js`. The refusal explains why, which is the
+         whole point of showing it rather than logging it. */
+      toast.error(error?.message ?? 'That payment was not recorded.');
     }
   };
 
@@ -100,6 +104,7 @@ const PaymentsAdminPage = () => {
       await loadTransactions();
     } catch (error) {
       console.error('Failed to update payment', error);
+      toast.error(error?.message ?? 'That payment was not updated.');
     }
   };
 

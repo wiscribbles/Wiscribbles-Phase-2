@@ -9,8 +9,8 @@ import { FiUser, FiFileText, FiCalendar, FiSettings, FiLogOut } from "react-icon
 import NotificationBell from '@/components/NotificationBell';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/firebase';
+/* The `firebase/firestore` query imports went with the notification-bell
+   query removed below. */
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -270,19 +270,9 @@ export default function SettingsPage() {
   const signOut = useAuthStore((state) => state.signOut);
   const router = useRouter();
 
-  useEffect(() => {
-    // Fetch pending meetings for notification bell
-    const fetchPendingMeetings = async () => {
-      const q = query(
-        collection(db, 'formSubmissions'),
-        where('status', '==', 'pending')
-      );
-      const querySnapshot = await getDocs(q);
-      const meetings = querySnapshot.docs.map(doc => doc.data());
-      setPendingMeetings(meetings);
-    };
-    fetchPendingMeetings();
-  }, []);
+  /* REMOVED: the notification-bell query for every pending `formSubmissions`
+     document on the platform. Denied by `firestore.rules`, threw on load, and
+     asked for other accounts' data. See the note on the profile screen. */
 
   const handleNotificationChange = (key) => {
     setNotifications((prev) => ({
