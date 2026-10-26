@@ -23,6 +23,7 @@ import {
   submitRequest,
 } from '@/lib/clientRequests';
 import { FeeError, quote } from '@/lib/fees';
+import { getPriceList } from '@/lib/pricing';
 import { SigningError } from '@/lib/signing';
 import { remoteWitnessingEnabled } from '@/lib/jurisdictions';
 
@@ -61,6 +62,11 @@ export async function GET(request) {
        in devtools before submission. */
     if (searchParams.get('quote') === '1') {
       try {
+        /* The Website Manager's live prices, so the figure quoted in the
+           wizard is the figure `submitRequest` will charge. Both resolve the
+           list the same way; neither reads a constant. */
+        const { prices, version } = await getPriceList();
+
         return NextResponse.json({
           quote: quote({
             notarized: searchParams.get('notarized') === 'true',
@@ -70,6 +76,8 @@ export async function GET(request) {
             witnessingAvailable: remoteWitnessingEnabled(
               searchParams.get('jurisdiction') ?? '',
             ),
+            prices,
+            priceListVersion: version,
           }),
         });
       } catch (error) {
@@ -97,7 +105,7 @@ export async function GET(request) {
       }
     }
 
-    return NextResponse.json({ options: requestOptions() });
+    return NextResponse.json({ options: await requestOptions() });
   } catch (error) {
     return authErrorResponse(error);
   }

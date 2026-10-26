@@ -21,7 +21,8 @@ const roleFilters = [
   { value: 'notary', label: 'Notaries' },
   { value: 'attorney', label: 'Attorneys' },
   { value: 'business', label: 'Business Accounts' },
-  { value: 'real_estate_agent', label: 'Real Estate Agents' },
+  /* 'real_estate_agent' removed — it is not in SELECTABLE_ROLES, so the
+     filter could only ever return nothing. */
 ];
 
 const normalizeStatus = (status) => {
@@ -73,7 +74,6 @@ const formatRoleLabel = (role, signUpAs) => {
     notary: 'Notary',
     attorney: 'Attorney',
     business: 'Business',
-    real_estate_agent: 'Real Estate Agent',
   };
   return map[normalized] || normalized.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
 };
@@ -89,8 +89,10 @@ const roleBadgeClass = (role, signUpAs) => {
       return 'bg-success-subtle text-dark';
     case 'business':
       return 'bg-warning-subtle text-dark';
-    case 'real_estate_agent':
-      return 'bg-secondary-subtle text-dark';
+    case 'coath':
+      /* Commissioners of Oaths had no colour here at all and fell through to
+         the default, which made a real role look like an unrecognised one. */
+      return 'bg-primary-subtle text-dark';
     default:
       return 'bg-light text-dark';
   }

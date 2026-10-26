@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { fetchAdminSettings, updateAdminSettings } from '@/services/AdminService';
+import PriceListEditor from '@/components/admin/PriceListEditor';
 import { Settings, Bell, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const AdminSettingsPage = () => {
@@ -87,6 +88,21 @@ const AdminSettingsPage = () => {
           performing notarial acts for reward while off that register is an offence.
         </div>
       )}
+
+      {/* ---- pricing -------------------------------------------------------
+          Unlike the switches above, this one takes effect immediately and
+          everywhere: the request wizard's live quote, the amount actually
+          charged, and the public pricing panel all read it. */}
+      <section className="card border-0 shadow-sm">
+        <div className="card-body">
+          <h3 className="h5 fw-semibold mb-1">Pricing</h3>
+          <p className="text-muted" style={{ fontSize: '0.9rem' }}>
+            What a client pays. Changes apply to the next quote — on the website,
+            in the request flow and at checkout — with no deploy needed.
+          </p>
+          <PriceListEditor />
+        </div>
+      </section>
 
       {loading && (
         <div className="d-flex align-items-center gap-2 text-muted">

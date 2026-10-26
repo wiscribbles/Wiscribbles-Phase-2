@@ -4,9 +4,12 @@
  * A tab that exists, is reachable, and is honest about not working yet.
  *
  * The Financials and Invoice tabs are both held back on a decision that is not
- * a coding decision: whether service-fee distribution to Caribbean notaries
- * runs through Stripe or WiPay, which turns on money-transmission licensing.
- * That was deferred until WiPay is fully set up.
+ * a coding decision. Collection now runs through Stripe — WiPay was switched
+ * off on 26 October 2026 — but that settles the gateway, not whose money it is
+ * on the way through, and it is the latter that turns on money-transmission
+ * licensing. Stripe Connect would settle to the professional directly and
+ * avoid the question entirely; its country support does not currently reach
+ * Caribbean notaries. So payouts stay parked.
  *
  * The alternative — building a payout screen against a guess — would be worse
  * than this placeholder. If the answer comes back the other way, a bank-detail

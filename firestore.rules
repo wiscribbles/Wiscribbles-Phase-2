@@ -112,6 +112,15 @@ service cloud.firestore {
           'stripeAccountId', 'stripeCustomerId', 'stripeSubscriptionId',
           'payoutsEnabled', 'availableBalance', 'lifetimeEarnings',
           'certificateVerified',
+          /* ADDED 26 OCT 2026. The expiry date is the control that ends a
+             notary's access when their commission does — an officer who could
+             write their own `credentialExpiresAt` could set it to 2099 and
+             defeat it entirely, which would be worse than not having the
+             control, because the platform would then assert a checked expiry
+             that nobody checked. `credentialExpiredAt` is the system's record
+             that access was withdrawn and is equally not the subject's to
+             edit. */
+          'credentialExpiresAt', 'credentialExpiredAt',
           'uid', 'email', 'createdAt'
         ];
       }

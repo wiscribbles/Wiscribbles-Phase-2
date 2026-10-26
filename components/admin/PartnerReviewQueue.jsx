@@ -45,6 +45,15 @@ export default function PartnerReviewQueue() {
   const [feedbackText, setFeedbackText] = useState('');
   const [pendingDecision, setPendingDecision] = useState(null);
 
+  /* The expiry date from the certificate, keyed by uid so switching between
+     applications does not carry one officer's date onto another's approval.
+     Required to approve a notary or Commissioner of Oaths — their access ends
+     when their commission does, and acting past it is an offence in Guyana
+     (Cap. 4:02 s.7) and Barbados (Notaries Public Act 2024 s.16). */
+  const [expiryFor, setExpiryFor] = useState({});
+  const setExpiry = (uid, value) =>
+    setExpiryFor((current) => ({ ...current, [uid]: value }));
+
   const load = useCallback(async (status) => {
     setApplications(null);
     setError(null);
@@ -74,7 +83,12 @@ export default function PartnerReviewQueue() {
       const response = await fetch('/api/admin/partners', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, decision, feedback }),
+        body: JSON.stringify({
+          uid,
+          decision,
+          feedback,
+          credentialExpiresAt: expiryFor[uid] ?? null,
+        }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -289,14 +303,82 @@ export default function PartnerReviewQueue() {
                 </div>
               </div>
             ) : (
-              <div className="d-flex flex-wrap gap-2 mt-3">
+              <div className="mt-3">
+                {/* ---- certificate expiry -------------------------------
+                    Only for the roles that hold a dated commission. A
+                    notary or Commissioner of Oaths cannot be approved
+                    without this: their access ends when the commission
+                    does, and `lib/admin/credentials.js` has nothing to
+                    enforce without a date. */}
+                {application.requiresCredentialExpiry && application.status !== 'approved' && (
+                  <div className="mb-3">
+                    <label
+                      className="form-label"
+                      htmlFor={`expiry-${application.uid}`}
+                      style={{ fontSize: '0.86rem', fontWeight: 600 }}
+                    >
+                      Certificate expiry date
+                    </label>
+                    <input
+                      id={`expiry-${application.uid}`}
+                      type="date"
+                      className="form-control"
+                      style={{ maxWidth: 220 }}
+                      value={expiryFor[application.uid] ?? ''}
+                      onChange={(event) => setExpiry(application.uid, event.target.value)}
+                    />
+                    <p className="mb-0 mt-1" style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                      Read it off the certificate above. Their access ends on
+                      this date and they are asked to upload a current one —
+                      acting as a notary after the commission expires is an
+                      offence, not an administrative lapse.
+                    </p>
+                  </div>
+                )}
+
+                {/* The expiry already recorded, where there is one. The
+                    manager needs to see it to know whether a renewal has
+                    actually been entered. */}
+                {application.credential && application.status === 'approved' && (
+                  <p
+                    className="mb-3"
+                    style={{
+                      fontSize: '0.84rem',
+                      color:
+                        application.credential.state === 'expired'
+                          ? '#b42318'
+                          : application.credential.state === 'expiring' ||
+                              application.credential.state === 'missing'
+                            ? '#8a5a00'
+                            : '#1b7f4b',
+                    }}
+                  >
+                    <strong>Certificate:</strong> {application.credential.label}
+                  </p>
+                )}
+
+                <div className="d-flex flex-wrap gap-2">
                 {application.status !== 'approved' && (
                   <button
                     type="button"
                     className="btn btn-sm"
-                    disabled={busy}
+                    disabled={
+                      busy ||
+                      /* Disabled rather than letting the server refuse. The
+                         manager would get a 422 they could have been spared,
+                         and a button that can only fail should not be live. */
+                      (application.requiresCredentialExpiry && !expiryFor[application.uid]) ||
+                      application.kycStatus !== 'approved'
+                    }
                     onClick={() => decide(application.uid, 'approve')}
                     style={{ background: '#1b7f4b', color: '#fff' }}
+                    title={
+                      application.kycStatus !== 'approved'
+                        ? 'Their identity has not been verified yet.'
+                        : application.requiresCredentialExpiry && !expiryFor[application.uid]
+                          ? 'Enter the certificate expiry date first.'
+                          : undefined
+                    }
                   >
                     {busy ? 'Working…' : 'Approve'}
                   </button>
@@ -334,6 +416,7 @@ export default function PartnerReviewQueue() {
                     Withdraw approval
                   </button>
                 )}
+                </div>
               </div>
             )}
           </article>

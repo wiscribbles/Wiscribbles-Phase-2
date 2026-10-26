@@ -1,10 +1,17 @@
 "use client";
-import ClientsFeedback from "@/components/home1/ClientsFeedback";
+/* `ClientsFeedback` is no longer imported here — see the note where the
+   testimonials section used to be. The component still exists for when there
+   are real clients willing to be quoted by name. */
+import { usePriceList, panelFigures, formatCents } from "@/hooks/usePriceList";
 import Hero1 from "@/components/home1/Hero1";
 import Layout from "@/layout/Layout";
 import SideBar from "@/layout/SideBar";
 import { sideBarToggle } from "@/utility";
-import { notarizeNow } from "@/lib/routes";
+import { ROUTES, notarizeNow, path } from "@/lib/routes";
+/* The exclusion check is the registry's, not a list copied into this file.
+   A category added to or removed from `lib/jurisdictions.js` moves the tile
+   without anybody having to remember this page exists. */
+import { isDocumentCategoryExcluded } from "@/lib/jurisdictions";
 import { useTranslations } from "next-intl";
 import Head from "next/head";
 import Link from "next/link";
@@ -32,6 +39,12 @@ const IndexOnePage = ({ params }) => {
   }, []);
   const t = useTranslations();
   const { locale, slug } = params;
+
+  /* The live price list. Nothing on this page may contain a figure of its own
+     — the Website Manager sets prices in the admin settings and they take
+     effect here on the next load. See hooks/usePriceList.js. */
+  const { list: priceList } = usePriceList();
+  const figures = panelFigures(priceList);
   
   // Debug: Check if blog_4_date translation exists
   useEffect(() => {
@@ -632,63 +645,106 @@ const IndexOnePage = ({ params }) => {
           </div>
           <div className="popular-docs-grid">
             <div className="row g-4">
+              {/* EACH TILE NOW ROUTES WHERE IT CAN ACTUALLY BE SERVED.
+                  26 October 2026.
+
+                  Five of these nine are excluded from electronic execution in
+                  Guyana by s.4 and the Schedule of the Electronic
+                  Communications and Transactions Act 2023. Advertising them as
+                  online notarisation was the problem; DELETING them would have
+                  been the wrong fix, because WiScribbles does serve them — on
+                  paper, through Prepare & Register. So the tile stays, says
+                  which route it takes, and goes there.
+
+                  `category` is checked against `lib/jurisdictions.js` rather
+                  than hard-coded, so an exclusion added or removed there moves
+                  the tile automatically. Guyana is the reference jurisdiction
+                  because it is the only launch market offering notarisation;
+                  a client in Trinidad is re-checked against Trinidad inside
+                  the request flow. */}
               {[
                 {
                   id: 'power-of-attorney',
                   icon: '/assets/v3/img/form-img01.png',
-                  title: 'Power of Attorney'
+                  title: 'Power of Attorney',
+                  category: 'power_of_attorney'
                 },
                 {
                   id: 'last-will',
                   icon: '/assets/v3/img/form-img02.png',
-                  title: 'Last Will & Testament'
+                  title: 'Last Will & Testament',
+                  category: 'last_will_and_testament'
                 },
                 {
                   id: 'agreement-of-sale',
                   icon: '/assets/v3/img/form-img03.png',
-                  title: 'Agreement of Sale'
+                  title: 'Agreement of Sale',
+                  category: 'agreement_of_sale'
                 },
                 {
                   id: 'lease-agreement',
                   icon: '/assets/v3/img/form-img04.png',
-                  title: 'Lease Agreement'
+                  title: 'Lease Agreement',
+                  category: 'lease_agreement'
                 },
                 {
                   id: 'promissory-note',
                   icon: '/assets/v3/img/form-img05.png',
-                  title: 'Promissory Note'
+                  title: 'Promissory Note',
+                  category: 'promissory_note'
                 },
                 {
+                  /* Not excluded by the Schedule — but s.5(1)(a) means a
+                     receiving authority is never obliged to ACCEPT an
+                     electronic document, and an immigration counter is the
+                     likeliest place to refuse one. Routed to the request flow,
+                     which warns at selection. */
                   id: 'passport-application',
                   icon: '/assets/v3/img/form-img06.png',
-                  title: 'Passport Application'
+                  title: 'Passport Application',
+                  category: 'attestation'
                 },
                 {
                   id: 'affidavit-of-identity',
                   icon: '/assets/v3/img/form-img07.png',
-                  title: 'Affidavit Of Identity'
+                  title: 'Affidavit Of Identity',
+                  category: 'affidavit'
                 },
                 {
                   id: 'property-management',
                   icon: '/assets/v3/img/form-img08.png',
-                  title: 'Property Management Agreement'
+                  title: 'Property Management Agreement',
+                  category: 'property_management'
                 },
                 {
                   id: 'custom-document',
                   icon: '/assets/v3/img/form-img09.png',
-                  title: 'Upload Your Own Document'
+                  title: 'Upload Your Own Document',
+                  category: null
                 }
-              ].map((doc, index) => (
+              ]
+                .map((doc) => ({
+                  ...doc,
+                  excluded: doc.category
+                    ? isDocumentCategoryExcluded('GY', doc.category)
+                    : false,
+                }))
+                .map((doc, index) => (
                 <div key={doc.id} className="col-lg-4 col-md-6 col-sm-6">
                   <div className="feature-item-five h-100 d-flex flex-column justify-content-center align-items-center">
-                    {/* Same reason as the navbar link above. The `?doc=` hint is
-                        dropped because the Phase 2 flow chooses jurisdiction and
-                        service BEFORE the document, so that an excluded type is
-                        refused with the statute named and offered Prepare &
-                        Register — which is exactly what six of these nine tiles
-                        need. The tiles themselves still advertise excluded
-                        documents; that is reported, not silently rewritten. */}
-                    <Link legacyBehavior href={notarizeNow(locale)}>
+                    {/* The `?doc=` hint is dropped because the Phase 2 flow
+                        chooses jurisdiction and service BEFORE the document.
+                        An excluded type goes straight to Prepare & Register
+                        instead of into a notarisation flow that would refuse
+                        it four screens later. */}
+                    <Link
+                      legacyBehavior
+                      href={
+                        doc.excluded
+                          ? path(locale, ROUTES.PREPARE_REGISTER)
+                          : notarizeNow(locale)
+                      }
+                    >
                       <a>
                         <img
                           className="mb-20"
@@ -696,6 +752,24 @@ const IndexOnePage = ({ params }) => {
                           alt={doc.title}
                         />
                         <h5>{doc.title}</h5>
+                        {/* Said on the tile, not discovered at checkout. These
+                            documents cannot be executed electronically in
+                            Guyana — s.4 and the Schedule of the 2023 Act — but
+                            they ARE served, on paper. A visitor who learns
+                            that here has been told the truth; one who learns
+                            it after uploading and paying has not. */}
+                        <span
+                          style={{
+                            display: 'block',
+                            marginTop: 6,
+                            fontSize: '0.78rem',
+                            opacity: 0.75,
+                          }}
+                        >
+                          {doc.excluded
+                            ? 'Prepared & registered on paper'
+                            : 'Notarise online'}
+                        </span>
                       </a>
                     </Link>
                   </div>
@@ -937,9 +1011,13 @@ const IndexOnePage = ({ params }) => {
             </div>
           </div>
           <div className="row d-flex flex-row align-items-stretch">
+            {/* Figures come from the live price list, never from this file.
+                See hooks/usePriceList.js for why. While it is loading, or if
+                it cannot be reached, the panel renders without a number
+                rather than inventing one. */}
             {[
-              { price: 15, per: t("per_notary_seal") },
-              { price: 25, per: t("per_two_signatories") },
+              { price: figures?.baseSingle, per: t("per_notary_seal"), single: true },
+              { price: figures?.baseTwo, per: t("per_two_signatories"), single: false },
             ].map((item, index) => (
               <div key={index} className="col-lg-6 ">
                 <div
@@ -949,39 +1027,59 @@ const IndexOnePage = ({ params }) => {
                 >
                   <span className="badge">{t("popular_package")}</span>
                   <div className="pricing-inner d-flex flex-column justify-content-between h-100 mt-30  align-items-start">
+                    {/* These four read "Landing page design", "HTML/CSS
+                        design", "Social media marketing" and "Domain &
+                        hosting provider" — the pricing features of the web
+                        template this theme came from, left in place on a
+                        notarisation platform. Replaced with what the fee
+                        actually buys. */}
                     <ul className="list-style-two mt-10">
-                      <li>{t("landing_page_design")}</li>
-                      <li>{t("html_css_design")}</li>
-                      <li>{t("social_media_marketing")}</li>
-                      <li>{t("domain_hosting_provider")}</li>
+                      <li>
+                        {item.single
+                          ? "One signatory, one notarial seal"
+                          : "Two signatories, one notarial seal"}
+                      </li>
+                      <li>Identity-verified notary or Commissioner of Oaths</li>
+                      <li>Sealed PDF with a verification reference</li>
+                      <li>Tamper-evident record kept for you</li>
                     </ul>
                     <div className="price-and-btn  w-100  ">
                       <div className="content d-flex  align-items-end   w-100 justify-content-between">
                         <div style={{ marginBottom: "-20px" }}>
                           <div className="d-flex flex-row  align-items-baseline gap-2 ">
                             <h2 style={{ color: "#416976", fontSize: "70px" }}>
-                              ${item.price}
+                              {formatCents(item.price) ?? "—"}
                             </h2>
                             <p className="fs-5">/ {item.per}</p>
                           </div>
                           <span className="save ">
-                            {item.price === 15 ? (
-                              <span> + $10 / {t("additional_witness")} </span>
+                            {item.single ? (
+                              <span>
+                                {" "}
+                                + {formatCents(figures?.witness)} /{" "}
+                                {t("additional_witness")}{" "}
+                              </span>
                             ) : (
                               <div
                                 style={{ lineHeight: "1", paddingTop: "10px" }}
                               >
-                                <p>+ $10 / {t("additional_signatory")}</p>
-                                <p>+ $10 / {t("witness")}</p>
+                                <p>
+                                  + {formatCents(figures?.additionalSignatory)} /{" "}
+                                  {t("additional_signatory")}
+                                </p>
+                                <p>
+                                  + {formatCents(figures?.witness)} / {t("witness")}
+                                </p>
                                 <p className="text-nowrap">
-                                  + $10 / {t("additional_notary_seal")}
+                                  + {formatCents(figures?.additionalSeal)} /{" "}
+                                  {t("additional_notary_seal")}
                                 </p>
                               </div>
                             )}
                           </span>
                         </div>
 
-                        <Link legacyBehavior href="/pricing">
+                        <Link legacyBehavior href={`/${locale}/pricing`}>
                           <a className="theme-btn style-three fw-bold">
                             {t("choose_package")}{" "}
                             <i className="fas fa-angle-double-right" />
@@ -1039,9 +1137,24 @@ const IndexOnePage = ({ params }) => {
       </section>
 
       {/* CTA Area end */}
-      {/* Testimonial Area Start */}
-      <ClientsFeedback />
-      
+
+      {/* TESTIMONIALS REMOVED — 26 October 2026.
+
+          `ClientsFeedback` rendered two lorem-ipsum paragraphs attributed to
+          "Jonathan B. Bohnert, CEO & Founder" and "Richard V. Dillingham,
+          Business Consultant", with stock photographs, and showed the first of
+          them twice. Those are invented clients saying invented things.
+
+          On a platform whose entire product is trustworthiness that is not a
+          placeholder to fill in later. Guyana's Consumer Affairs Act 2011
+          s.54(1) bites on misrepresentation to consumers, and Barbados ETA
+          s.16A and Trinidad's Adverse Trade Practices Order are in the same
+          family. The fix is not better-written testimonials — that would be
+          the same offence with better prose. It is not publishing feedback
+          until there are real clients willing to be quoted by name.
+
+          The component is left in the tree for when there are. */}
+
       <section
         id="contact"
         className="contact-area overflow-hidden py-130 bgc-black-with-lighting rel z-1"

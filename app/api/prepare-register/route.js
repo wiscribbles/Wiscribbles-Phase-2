@@ -24,6 +24,7 @@ import {
   listForClient,
 } from '@/lib/prepareRegister';
 import { prepareRegisterFee } from '@/lib/fees';
+import { getPriceList } from '@/lib/pricing';
 import { DOCUMENT_CATEGORIES } from '@/lib/templates';
 
 export const runtime = 'nodejs';
@@ -54,14 +55,21 @@ export async function GET(request) {
 
     if (jurisdiction && category) {
       return NextResponse.json(
-        checkEligibility({ jurisdiction, documentCategory: category }),
+        checkEligibility({
+          jurisdiction,
+          documentCategory: category,
+          prepareRegisterGyd: (await getPriceList()).prices.PREPARE_REGISTER_GYD,
+        }),
       );
     }
 
     return NextResponse.json({
       options: {
         notice: PR_NOTICE,
-        fee: prepareRegisterFee(),
+        /* The live figure. The Prepare & Register price is settable by the
+           Website Manager like every other line; reading the constant here
+           would quote a price the charge does not use. */
+        fee: prepareRegisterFee((await getPriceList()).prices.PREPARE_REGISTER_GYD),
         delivery: DELIVERY_OPTIONS,
         categories: DOCUMENT_CATEGORIES,
         /* Which jurisdiction excludes what, from the registry rather than a

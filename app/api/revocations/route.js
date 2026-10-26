@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { getPriceList } from '@/lib/pricing';
 import { adminDb } from '@/lib/firebase-admin';
 import { authErrorResponse, requireApiUser } from '@/lib/auth/server';
 import {
@@ -37,7 +38,7 @@ export async function GET() {
       requests: await listForParty(user.uid),
       options: {
         notice: RR_NOTICE,
-        fee: revocationRequestFee(),
+        fee: revocationRequestFee((await getPriceList()).prices.PREPARE_REGISTER_GYD),
         grounds: revocationGrounds(),
       },
     });

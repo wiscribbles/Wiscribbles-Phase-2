@@ -21,6 +21,7 @@ import { TABS } from '@/lib/roles';
 const TAB_LABELS = {
   [TABS.ACCOUNT]: 'Account',
   [TABS.ANALYTICS]: 'Analytics',
+  [TABS.NOTARIAL_REGISTER]: 'Acts Register',
   [TABS.SUPPORT]: 'Support',
   [TABS.FINANCIALS]: 'Financials',
   [TABS.APPOINTMENT]: 'Appointments',

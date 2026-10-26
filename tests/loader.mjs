@@ -27,6 +27,11 @@ const STUBS = new Map([
   ['server-only', 'tests/stubs/server-only.mjs'],
   ['@/lib/firebase-admin', 'tests/stubs/firebase-admin.mjs'],
   ['@/lib/storage/server', 'tests/stubs/storage-server.mjs'],
+  /* Records claim writes instead of making them. Without this the suspension
+     lapse and the certificate expiry are untestable, because both write
+     custom claims through `adminAuth()`, which the firebase-admin stub
+     refuses. See tests/stubs/auth-claims.mjs. */
+  ['@/lib/auth/claims', 'tests/stubs/auth-claims.mjs'],
 ]);
 
 export async function resolve(specifier, context, nextResolve) {

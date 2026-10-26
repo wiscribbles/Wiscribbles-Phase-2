@@ -70,7 +70,17 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
 
-    const { uid, decision, feedback = null, suspendedUntil = null } = body ?? {};
+    const {
+      uid,
+      decision,
+      feedback = null,
+      suspendedUntil = null,
+      /* The expiry date from the certificate in front of the manager.
+         Required when approving or reinstating a notary or Commissioner of
+         Oaths — `decidePartnerApplication` refuses without it, because
+         without a date there is nothing for the lapse check to enforce. */
+      credentialExpiresAt = null,
+    } = body ?? {};
 
     if (!uid || !Object.values(DECISION).includes(decision)) {
       return NextResponse.json(
@@ -99,13 +109,26 @@ export async function PATCH(request) {
         decision,
         feedback,
         suspendedUntil,
+        credentialExpiresAt,
         actor: { uid: admin.uid, email: admin.email },
       });
       return NextResponse.json({ ok: true, ...result });
     } catch (error) {
       if (error instanceof DecisionError) {
+        /* 422 for anything the manager can put right on the form — a missing
+           reason, a missing or bad expiry date, an applicant who has not
+           finished identity verification. 400 is for a malformed request,
+           which is a different thing and should not be reported as though the
+           manager typed something wrong. */
+        const RECOVERABLE = new Set([
+          'feedback_required',
+          'credential_expiry_required',
+          'kyc_incomplete',
+        ]);
+
         const status =
-          error.code === 'not_found' ? 404 : error.code === 'feedback_required' ? 422 : 400;
+          error.code === 'not_found' ? 404 : RECOVERABLE.has(error.code) ? 422 : 400;
+
         return NextResponse.json({ error: error.code, message: error.message }, { status });
       }
       throw error;

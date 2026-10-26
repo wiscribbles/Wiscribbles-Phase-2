@@ -7,7 +7,9 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import Image from "next/image";
 
-const HowItWorks = ({ params: { form_id } }) => {
+/* `form_id` was destructured and never used; this route has no such param.
+   `locale` is the one it actually has, and the sign-up links need it. */
+const HowItWorks = ({ params: { locale = "en" } }) => {
   const st = useTranslations("solutions");
   return (
     <Layout footer={1}>
@@ -29,7 +31,19 @@ const HowItWorks = ({ params: { form_id } }) => {
                     <p style={{ textAlign: "justify" }}>
                       {st(`sec${secNo}.para1`)} {st(`sec${secNo}.para2`)}
                     </p>
-                    <Link legacyBehavior href={`/en/signUp?signUpAs=${secNo === 1 ? 'Notary' : secNo === 2 ? 'Attorney' : secNo === 3 ? 'Real Estate Agent' : 'Business'}`}>
+                    {/* `Real Estate Agent` was offered here as a fourth
+                        sign-up type. It is not a role the platform has —
+                        `SELECTABLE_ROLES` in lib/roles.js is client, notary,
+                        Commissioner of Oaths, attorney and business — so the
+                        link sent people to a sign-up form for an account that
+                        could never be approved. Section 3 now offers a
+                        Commissioner of Oaths, which is a real role and the one
+                        missing from this page.
+
+                        The locale was also hard-coded to `/en/`, which is the
+                        bug lib/routes.js exists to end: a Spanish visitor was
+                        thrown into the English sign-up. */}
+                    <Link legacyBehavior href={`/${locale}/auth/signup?signUpAs=${secNo === 1 ? 'Notary' : secNo === 2 ? 'Attorney' : secNo === 3 ? 'Commissioner of Oaths' : 'Business'}`}>
                       <a className="theme-btn mt-15" style={{ color: secNo === 1 ? '#FFFFFF' : undefined }}>
                         {st(`sec${secNo}.button`)} <i className="fas fa-angle-double-right" />
                       </a>
@@ -100,7 +114,19 @@ const HowItWorks = ({ params: { form_id } }) => {
                     <p style={{ textAlign: "justify" }}>
                       {st(`sec${secNo}.para1`)} {st(`sec${secNo}.para2`)}
                     </p>
-                    <Link legacyBehavior href={`/en/signUp?signUpAs=${secNo === 1 ? 'Notary' : secNo === 2 ? 'Attorney' : secNo === 3 ? 'Real Estate Agent' : 'Business'}`}>
+                    {/* `Real Estate Agent` was offered here as a fourth
+                        sign-up type. It is not a role the platform has —
+                        `SELECTABLE_ROLES` in lib/roles.js is client, notary,
+                        Commissioner of Oaths, attorney and business — so the
+                        link sent people to a sign-up form for an account that
+                        could never be approved. Section 3 now offers a
+                        Commissioner of Oaths, which is a real role and the one
+                        missing from this page.
+
+                        The locale was also hard-coded to `/en/`, which is the
+                        bug lib/routes.js exists to end: a Spanish visitor was
+                        thrown into the English sign-up. */}
+                    <Link legacyBehavior href={`/${locale}/auth/signup?signUpAs=${secNo === 1 ? 'Notary' : secNo === 2 ? 'Attorney' : secNo === 3 ? 'Commissioner of Oaths' : 'Business'}`}>
                       <a className="theme-btn mt-15 t" style={{ color: secNo === 1 ? '#FFFFFF' : undefined }}>
                         {st(`sec${secNo}.button`)} <i className="fas fa-angle-double-right" />
                       </a>

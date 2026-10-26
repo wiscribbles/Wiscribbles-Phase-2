@@ -16,6 +16,7 @@ import PartnerDashboardShell from '@/components/dashboard/PartnerDashboardShell'
 import GoLiveToggle from '@/components/dashboard/GoLiveToggle';
 import RequestQueue from '@/components/dashboard/RequestQueue';
 import AnalyticsTab from '@/components/dashboard/AnalyticsTab';
+import NotarialRegisterTab from '@/components/dashboard/NotarialRegisterTab';
 import ParkedTab from '@/components/dashboard/ParkedTab';
 import SupportTab from '@/components/dashboard/SupportTab';
 import AccountTab from '@/components/onboarding/AccountTab';
@@ -76,6 +77,10 @@ export default function WorkingPartnerDashboard({
 
         if (active === TABS.ANALYTICS) return <AnalyticsTab />;
 
+        /* The officer's own statutory register — Barbados Notaries Public Act
+           2024 s.12(1). See the note on TABS.NOTARIAL_REGISTER. */
+        if (active === TABS.NOTARIAL_REGISTER) return <NotarialRegisterTab />;
+
         if (active === TABS.SUPPORT) return <SupportTab />;
 
         if (active === TABS.FINANCIALS) {
@@ -83,12 +88,12 @@ export default function WorkingPartnerDashboard({
             <ParkedTab
               title="Financials"
               waitingOn={
-                'Payouts are not switched on yet. Whether service fees reach ' +
-                'Caribbean professionals through Stripe or through WiPay turns ' +
-                'on money-transmission licensing, not on code, and that is ' +
-                'being settled now. Bank details are deliberately not being ' +
-                'collected until the answer is known, so that nobody enters ' +
-                'them twice into two different providers.'
+                'Payouts are not switched on yet. Clients pay through Stripe, ' +
+                'but how that money then reaches you turns on money-transmission ' +
+                'licensing rather than on code, and that is being settled now. ' +
+                'Bank details are deliberately not being collected until the ' +
+                'answer is known, so that nobody enters them twice into two ' +
+                'different arrangements.'
               }
               meanwhile={
                 'Nothing is lost in the meantime: every session you complete is ' +
