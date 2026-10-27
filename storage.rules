@@ -37,19 +37,32 @@ service firebase.storage {
       return signedIn() ? request.auth.token.get('role', 'client') : 'client';
     }
 
-    function status() {
-      return signedIn() ? request.auth.token.get('status', 'email_unverified') : 'email_unverified';
-    }
-
     function isAdmin() {
       return role() == 'admin';
     }
 
-    function isApprovedPartner() {
-      return emailVerified()
-        && status() == 'approved'
-        && role() in ['notary', 'coath', 'attorney', 'business'];
-    }
+    /* REMOVED 27 OCT 2026 — `isApprovedPartner()` and the `status()` helper it
+       was the only caller of.
+
+       The deploy linter reported them: "Unused function: isApprovedPartner"
+       and "Invalid variable name: request." on the `status()` line. Both
+       pointed at the same dead branch — `status()` had exactly one call site,
+       inside `isApprovedPartner()`, which had none.
+
+       THIS IS NOT A MISSING GUARD, which is the thing to check before deleting
+       a function with "approved partner" in its name. Every path that might
+       have wanted it is already stricter: `/users/{userId}/**` is owner-scoped
+       (and a partner must be able to upload their certificate BEFORE approval,
+       so an approval check there would have been wrong), `/documents/**` and
+       `/stamps/**` are `write: false` with all writes going through the Admin
+       SDK, and the catch-all denies everything else. An approval check would
+       have loosened two of those, not tightened them.
+
+       If a future path does need it, note what the linter was objecting to:
+       `request.auth.token.get(key, default)` is Firestore rules syntax and the
+       Storage dialect does not accept it the same way. Read the claim with
+       `request.auth.token.status` and compare, rather than reinstating
+       `.get()`. */
 
     /** Brief: "Max File Size: Must adhere to the system limit (e.g. 25MB)". */
     function withinSizeLimit() {
