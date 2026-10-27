@@ -25,11 +25,32 @@ expensive failures here are the ones you only notice two steps later.
   result in an environment with no Firebase credentials** — the 404 page pulls
   in the client SDK, which refuses to initialise without a real API key. With
   the environment variables in step 2 set, this step passes.
-- `npm test` — 123 tests, all passing, zero dependencies added. Run it before
-  every deploy; it is the only automated check this project has.
+- `npm test` — **199 tests**, all passing, zero dependencies added. Run it
+  before every deploy; it is the only automated check this project has.
 - `netlify.toml` is committed, with security headers and no secrets.
-- `npm run deploy-rules` has been run against **`wiscribbles-ecdea`** (as of
-  19 Oct 2026, 26 composite indexes). See step 1 — do not assume it is current.
+- **Firestore rules, indexes and Storage rules are DEPLOYED to
+  `wiscribbles-ecdea` as of 27 October 2026, from the `phase2-live-test`
+  branch** — 24 composite indexes, and the ruleset that protects `signUpAs`,
+  `isStaff`, `staffRole`, `credentialExpiresAt` and `credentialExpiredAt`.
+
+  Two things went wrong getting there, both worth knowing because both will
+  recur:
+
+  1. **The index deploy failed four times on the same error** —
+     `HTTP Error: 400, this index is not necessary, configure using single
+     field index controls`. Three entries declared a single field as a
+     composite index. Firestore refuses those, and **the refusal aborts the
+     whole deploy**, so the twenty-three valid indexes did not get created
+     either. The error names one index and the symptom is that none of them
+     land. See `docs/FIRESTORE_INDEXES.md`.
+  2. **The rules were deployed from the wrong branch, twice.** The working
+     clone was on `main`, six commits behind, whose ruleset predates the
+     privilege-escalation fix entirely. The deploy reported success each time
+     because it *was* succeeding — at publishing the old rules. **Check
+     `git log --oneline -1` before any deploy**, and after a rules deploy look
+     for the line `released rules firestore.rules to cloud.firestore`; an
+     index-only deploy compiles the rules file without releasing it, which
+     reads almost identically in the log.
 
 ---
 
@@ -150,22 +171,37 @@ for a stale variable of that name.
 | `DIDIT_WEBHOOK_SECRET` | **yes** |
 | `DIDIT_WORKFLOW_ID` | no — from Didit Console → Workflows; required to start a session |
 
-### Payments — set up but **leave collection off**
+### Payments — Stripe only. WiPay is off.
 
-Stripe and WiPay are built and deliberately dormant, pending the
-money-transmission decision on paying Caribbean professionals. You can set the
-keys so the configuration is complete, but **do not switch collection on** as
-part of this deploy.
+As of 26 October 2026 **Stripe is the only payment provider**. The switch is
+`WIPAY_ENABLED = false` in `lib/payments/index.js`, not the absence of
+credentials — the routing checks the flag, so filling in the WiPay variables
+does not re-enable it.
 
-Stripe: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (no),
+Set: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (no),
 `STRIPE_SECRET_KEY` (**secret**), `STRIPE_WEBHOOK_SECRET` (**secret**).
 
-WiPay: `WIPAY_ENVIRONMENT` (`sandbox` until live), `WIPAY_COUNTRY`,
-`WIPAY_ACCOUNT_NUMBER`, `WIPAY_ORIGIN`, and `WIPAY_API_KEY` (**secret**).
+**Leave every `WIPAY_*` variable unset.** Setting `WIPAY_API_KEY` while WiPay
+is disabled achieves nothing except putting a live credential somewhere it is
+not needed — and WiPay's payment-request endpoint is unauthenticated, so that
+key is the only thing preventing a forged "payment succeeded" callback.
 
-`WIPAY_API_KEY` deserves its own warning: WiPay's payment-request endpoint is
-unauthenticated, so the response hash is the only thing preventing a forged
-"payment succeeded" callback. If that key leaks, anyone can forge one.
+### Do NOT set these
+
+| Variable | Why |
+|---|---|
+| `NEXT_PUBLIC_ZEGOCLOUD_SERVER_SECRET` | `videoConfig()` **throws** if it is set, deliberately. A `NEXT_PUBLIC_` prefix publishes the server secret to every browser that loads the app, and the app would still work — so nothing else would ever reveal the mistake. Use `ZEGOCLOUD_SERVER_SECRET`. |
+| `FIREBASE_SERVICE_ACCOUNT`, `GOOGLE_APPLICATION_CREDENTIALS` | Alternative ways to supply Admin credentials. Set the three `FIREBASE_ADMIN_*` variables instead, and only those — supplying two mechanisms makes it unclear which one is actually in use. |
+| any `WIPAY_*` | See above. |
+
+### `FIREBASE_ADMIN_PRIVATE_KEY` — the one that always breaks
+
+It is a multi-line PEM. Paste it into Netlify complete, including the
+`-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines. If the
+build fails with a JWT or "invalid PEM" error, the newlines were flattened:
+`lib/firebase-admin.js` normalises `\n` escapes, so the fix is to paste the key
+with literal `\n` sequences rather than real line breaks, not to re-issue the
+key.
 
 **Verify step 2:** Netlify → Deploys → trigger a deploy → the build log shows
 `✓ Compiled successfully` **and** gets past `/_not-found` without the
