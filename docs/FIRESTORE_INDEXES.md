@@ -19,6 +19,38 @@ firebase deploy --only firestore:indexes
 > every index. The script now includes `firestore:indexes`. If you ran the old
 > version, run `npm run deploy-rules` again.
 
+> **Correction, 27 October 2026 — three declared indexes were rejected.**
+> `firebase deploy --only firestore:indexes` failed with:
+>
+> ```
+> HTTP Error: 400, this index is not necessary,
+> configure using single field index controls
+> ```
+>
+> Three entries declared a **single field** as a composite index:
+> `documents.referenceNumber`, `documents.signingDeadline` and
+> `documentTemplates.active`. Firestore maintains a single-field index for
+> every field automatically, so declaring one is not merely redundant — the API
+> refuses it, and **the refusal aborts the whole deploy**, so twenty-three
+> perfectly good indexes did not get created either.
+>
+> The first two were deleted outright. The queries behind them are
+> single-field and run on the automatic index:
+> `where('referenceNumber','==',…)` in `lib/authentication.js` and
+> `where('signingDeadline','<=',…)` in `lib/retention.js` and
+> `scripts/sweep-expired.mjs`.
+>
+> `documentTemplates.active` was different and worth dwelling on: it was both
+> rejected AND wrong. `lib/clientRequests.js` chains two equality filters —
+> `.where('active','==',true).where('executionMode','==',mode)` — which is a
+> genuine composite query that the declared single-field index would never have
+> served. It has been replaced with `active ASC, executionMode ASC`. So the
+> rejection was doing a favour: the index that was refused would not have
+> worked, and the query would have failed at runtime for the first client to
+> reach the template list.
+>
+> Count went from 26 declared to 24 real.
+
 ## Why these exist at all
 
 Firestore needs a composite index for any query that combines equality filters
